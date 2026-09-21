@@ -1,0 +1,8 @@
+# Binaires compilés
+/bin/
+# Snapshots de grilles (volumineux, régénérables)
+/snapshots/
+# Artefacts temporaires
+*.test
+*.out
+# Les résultats de mesure (results/) et les profils SONT versionnés : ce sont les pièces à conviction.
