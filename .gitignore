@@ -11,3 +11,5 @@
 /.idea/material_theme_project_new.xml
 /.idea/modules.xml
 /.idea/vcs.xml
+# Sujet/barème fournis par l'école, pas des sources du projet
+/rapport/*.pdf
