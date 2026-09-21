@@ -6,3 +6,8 @@
 *.test
 *.out
 # Les résultats de mesure (results/) et les profils SONT versionnés : ce sont les pièces à conviction.
+/.idea/go.imports.xml
+/.idea/jdv.iml
+/.idea/material_theme_project_new.xml
+/.idea/modules.xml
+/.idea/vcs.xml
