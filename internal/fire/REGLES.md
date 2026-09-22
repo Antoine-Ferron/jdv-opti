@@ -99,7 +99,7 @@ l'amont. Le vent est un coup de pouce local, pas un front directionnel.
 - Les foyers de départ sont tirés parmi les cases combustibles avec **la même graine** que
   le terrain. Leur nombre est réglable (défaut : 1).
 - Pas de foudre en cours de partie : l'allumage est uniquement initial.
-- La simulation s'arrête quand plus aucune case n'est en feu, quand le nombre de tours
+- La simulation s'arrête quand plus aucune case n'est en feu, ou quand le nombre de tours
   demandé est atteint. Il n'y a pas d'arrêt sur cycle : un incendie entretenu ne repasse
   pas par un état déjà vu, et le détecter coûterait une empreinte par tour pour rien.
 
