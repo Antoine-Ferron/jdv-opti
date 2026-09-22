@@ -46,3 +46,7 @@ tools: ## Installe benchstat
 
 clean: ## Supprime binaires et snapshots (les résultats sont conservés)
 	rm -rf bin snapshots
+
+.PHONY: web
+web: ## Lance la page interactive sur http://127.0.0.1:8081
+	go run ./cmd/web

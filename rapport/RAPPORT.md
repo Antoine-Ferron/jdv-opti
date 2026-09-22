@@ -15,50 +15,79 @@ Trois phrases : point de départ (débit baseline en cellules/s), point d'arriv�
 
 ### 1.1 Banc d'essai matériel
 
-Source : `results/env-2026-09-22.md` (généré par `make env`, complété des relevés hôte Windows).
+Cette section documente la campagne du 22 septembre 2026 sur Mac.
+Source : [env.md](../results/20260922-232134-6fc36f2/env.md).
+Le relevé Intel/WSL précédemment présent est conservé dans
+[ENVIRONNEMENT-WSL.md](ENVIRONNEMENT-WSL.md) ; il ne décrit pas cette campagne.
 
-| Élément                   | Valeur                                                                                             |
-|---------------------------|----------------------------------------------------------------------------------------------------|
-| CPU (modèle)              | Intel Core Ultra 9 275HX (Arrow Lake-HX), base 2,7 GHz                                             |
-| Cœurs physiques / threads | 24 / 24 — **pas de SMT** : 1 thread par cœur                                                       |
-| L1d / L1i (par cœur)      | 48 Kio / 64 Kio                                                                                    |
-| L2                        | 3 Mio privés par cœur — **40 Mio au total** côté hôte                                              |
-| L3                        | 36 Mio partagés par les 24 cœurs                                                                   |
-| Ligne de cache            | 64 o                                                                                               |
-| RAM                       | 64 Gio DDR5-6400 (2×32 Gio SK Hynix) — **31 Gio visibles depuis WSL2**                             |
-| OS / noyau                | Windows 11 Famille 10.0.26200 → **WSL2** Ubuntu 26.04 LTS, noyau 6.6.114.1-microsoft-standard-WSL2 |
-| Runtime                   | go1.27.1 linux/amd64, `GOAMD64=v1`, `CGO_ENABLED=0`, `GOGC=100`, `GOMAXPROCS=24`                   |
-| SIMD disponibles          | sse4_2, avx, avx2 (pas d'AVX-512 sur Arrow Lake)                                                   |
-| Alimentation / gouverneur | secteur, profil Acer `ed2c8e98-…` ; gouverneur **non exposé** sous WSL2                            |
+| Élément | Valeur relevée |
+|---|---|
+| CPU | Apple M1 |
+| Cœurs physiques / logiques | 8 / 8 |
+| RAM | 8 Gio |
+| Système | macOS 15.5, build 24F74 |
+| Runtime Go | go1.27.1, darwin/arm64 |
+| CGO_ENABLED | 1 |
+| GOGC | Valeur par défaut : 100 |
+| GOMAXPROCS | Variable non définie |
+| Hyperfine | 1.20.0 |
+| Ligne de cache | 128 octets |
+| Cache L1 instructions | 128 Kio |
+| Cache L1 données | 64 Kio |
+| Cache L2 | 4 Mio |
 
-**Trois réserves à porter au crédit de la métrologie, pas à sa charge :**
+Les valeurs de cache sont celles rapportées par le script ; elles ne décrivent
+pas exhaustivement la topologie du processeur. Le cache L3 n'est pas renseigné.
+L'alimentation, la fréquence CPU et la fermeture des autres applications ne sont
+pas documentées dans ce relevé.
 
-1. **Virtualisation Hyper-V.** Les mesures tournent dans WSL2, pas sur le métal. Le
-   coût est constant entre toutes les versions comparées — les *rapports* de gain
-   restent valides, les valeurs absolues de débit sont minorées.
-2. **Topologie hybride masquée.** L'Arrow Lake-HX mêle P-cores et E-cores, mais WSL2
-   présente 24 cœurs homogènes (`lscpu` annonce même 72 Mio de L2, contre 40 Mio
-   relevés côté hôte). Conséquence directe pour le §3.2 : un worker pool dimensionné
-   à `GOMAXPROCS` répartit le travail sur des cœurs de puissances inégales, et la
-   génération la plus lente impose son rythme à la barrière de synchronisation.
-   Attendre une scalabilité sous-linéaire dès que le nombre de workers dépasse le
-   nombre de P-cores.
-3. **Fréquence non verrouillée.** Ni gouverneur ni état turbo ne sont pilotables
-   depuis WSL2 : c'est le warmup Hyperfine et le coefficient de variation qui
-   attestent de la stabilité, pas un réglage système.
+La campagne référence le commit `6fc36f2`, avec des modifications non commitées
+signalées par le script. Ce commit seul ne permet donc pas de reconstituer
+exactement l'état des sources mesurées.
 
 ### 1.2 Protocole de mesure
 
-- Outil : Hyperfine `-N --warmup 3 --runs 15`, binaire exécuté sans shell intermédiaire.
-- Justification du warmup : cache disque du binaire, caches CPU, stabilisation de la fréquence.
-- Charge de travail : grille 1024×1024, graine 42, densité 0,3, 50 générations. **Identique pour toutes les versions.**
-- Isolation du bruit : navigateur/IDE fermés, machine sur secteur, charge système vérifiée avant chaque campagne (voir `env.md`), [pinning `taskset` si utilisé].
-- Micro-benchmarks : `go test -bench -benchmem -count 10`, comparés avec benchstat (intervalle de confiance, test de significativité).
+La mesure globale utilise une grille de 1024 × 1024 cellules, une graine de 42,
+une densité initiale de 0,3 et un maximum de 50 générations. La détection de cycles
+est activée et les snapshots sont désactivés.
+
+Les tests de conformité précèdent la compilation et les mesures. Hyperfine
+exécute le binaire sans shell intermédiaire (`-N`), avec 3 exécutions
+d'échauffement puis 15 exécutions mesurées. L'échauffement vise à réduire les
+effets du démarrage ; il ne garantit pas une fréquence CPU constante.
+
+Hyperfine mesure l'exécution complète du processus, y compris la création de la
+grille initiale. Le chronomètre interne de `gol` exclut cette création : ces deux
+périmètres ne doivent pas être confondus.
+
+Les micro-benchmarks Go sont répétés 10 fois avec `-benchmem` : ils mesurent
+séparément `Step`, `Fingerprint` et une simulation complète (`Run`). Pour `Step`,
+la préparation du moteur est hors chronométrage et la grille évolue au fil des
+itérations. Pour `Fingerprint`, la grille initiale reste fixe. Ces deux mesures
+ne portent donc pas sur la même succession d'états.
+
+Sources : [script de mesure](../scripts/run_benchmarks.sh),
+[benchmarks](../internal/bench/bench_test.go),
+[tests de la campagne](../results/20260922-232134-6fc36f2/tests.txt).
 
 ### 1.3 Mesures de référence
 
-Coller `results/<run>/hyperfine-stats.md` (moyenne, médiane, écart-type, variance, CV).
-Commenter le coefficient de variation : < 2 % = mesure stable.
+Source : [statistiques Hyperfine](../results/20260922-232134-6fc36f2/hyperfine-stats.md).
+
+| Indicateur | Version naive |
+|---|---:|
+| Temps moyen | 2,1231 s |
+| Médiane | 2,1204 s |
+| Écart-type | 0,0217 s |
+| Variance | 0,0004698 s² |
+| Minimum | 2,0932 s |
+| Maximum | 2,1649 s |
+| Coefficient de variation | 1,0 % |
+
+Le coefficient de variation de 1 % indique une faible dispersion sur cette
+campagne de 15 exécutions. Il ne prouve pas l'absence de biais systématique.
+Ces résultats constituent la référence avant optimisation ; aucune accélération
+n'est encore démontrée par cette campagne qui ne mesure que `naive`.
 
 ---
 
@@ -66,24 +95,74 @@ Commenter le coefficient de variation : < 2 % = mesure stable.
 
 ### 2.1 Profil CPU de la baseline
 
-![Flamegraph CPU baseline](figures/flame-cpu-naive.png)
+Sources : [profil CPU](../results/profiles/naive-cpu-top.txt) et
+[coût par ligne](../results/profiles/naive-cpu-list.txt).
 
-Annoter la capture : encadrer `Fingerprint` → `fmt.Sprintf`, et `Step` → `neighbors`.
-Source : `results/profiles/naive-cpu-top.txt`, `naive-cpu-list.txt` (coût ligne par ligne).
+Le profil daté du 21 septembre provient d'une exécution distincte de la campagne
+du 22 septembre. Il couvre 2,32 s d'exécution, avec 1,96 s d'échantillons CPU.
+Les pourcentages ci-dessous portent sur les échantillons CPU, pas sur le temps
+écoulé mesuré par Hyperfine.
+
+| Fonction | Part directe (`flat`) | Part appels inclus (`cum`) |
+|---|---:|---:|
+| `neighbors` | 29,08 % | 29,08 % |
+| `Step` | 6,12 % | 35,71 % |
+| `Fingerprint` | 0,51 % | 11,22 % |
+| `runtime.madvise` | 42,86 % | 42,86 % |
+
+Le coût de `neighbors` est inclus dans celui de `Step` : les pourcentages cumulés
+ne s'additionnent pas. La part importante de `runtime.madvise` mérite une
+investigation ; ce profil seul ne permet pas de l'attribuer entièrement au GC.
+
+![Flamegraph CPU de naive](figures/flame-cpu-naive.png)
+
 
 ### 2.2 Profil d'allocations
 
-![Flamegraph allocations baseline](figures/flame-alloc-naive.png)
+Source : [micro-benchmarks bruts](../results/20260922-232134-6fc36f2/bench.txt).
 
-Chiffres attendus : allocations par génération (`allocs/op` de `BenchmarkStep` et `BenchmarkFingerprint`), octets alloués, part du temps passée dans `runtime.mallocgc` et dans le GC (`GODEBUG=gctrace=1`).
+| Opération, grille 1024 × 1024 | Octets alloués par opération | Allocations par opération |
+|---|---:|---:|
+| Une génération (`Step`) | Environ 1 075 840 o | 1 025 |
+| Une empreinte (`Fingerprint`) | Environ 22,2 Mo | Environ 786 000 |
 
-### 2.3 Identification formelle du hot path
+Ces volumes représentent les allocations cumulées par opération, pas la mémoire
+occupée simultanément. Le résultat de `Fingerprint` concerne la grille initiale
+fixe du micro-benchmark ; il ne peut pas être multiplié directement par le nombre
+de générations pour prédire les allocations d'une simulation qui évolue.
 
-Pour chaque goulot, l'enchaînement **symptôme mesuré → cause mécanique → preuve** :
+Dans le [profil d'allocations](../results/profiles/naive-mem-top.txt),
+`Fingerprint`, appels inclus, représente 92,02 % des octets alloués et `Step`
+7,50 %. Les allocations de `fmt.Sprintf` et de `strings.Builder` sont déjà
+incluses dans le total de `Fingerprint`.
 
-1. **`Fingerprint`, xx % du CPU** — un `fmt.Sprintf` par cellule vivante (~300 000 par génération en 1024²) : réflexion, conversion d'entiers, allocation d'une chaîne à chaque appel, puis copie `string → []byte` → pression GC.
-2. **`neighbors`, xx % du CPU** — 8 modulos (division entière : ~20-40 cycles chacune) et 8 branchements par cellule ; double indirection `[][]bool` : chaque ligne est un bloc distinct du tas, la ligne y-1, y et y+1 ne sont pas contiguës.
-3. **`Step`, une grille complète allouée par génération** — 1024 slices + 1 Mo par génération, collectés par le GC.
+Une mesure spécifique du temps et des pauses GC reste à réaliser. Les allocations seules ne permettent pas de quantifier ces pauses.
+
+![Flamegraph des allocations de naive](figures/flame-alloc-naive.png)
+
+### 2.3 Identification des opérations coûteuses
+
+Source du diagnostic : [moteur naive](../internal/naive/naive.go), confronté aux
+mesures des sections 2.1 et 2.2.
+
+- **Reconstruction de la grille.** `Step` alloue une nouvelle grille à chaque
+  génération : un tableau de lignes et 1 024 lignes pour une grille de hauteur
+  1 024. Cela explique les 1 025 allocations mesurées. La réutilisation de deux
+  buffers constitue une hypothèse d'optimisation à tester.
+- **Construction de l'empreinte.** `Fingerprint` appelle `fmt.Sprintf` pour
+  chaque cellule vivante, assemble les coordonnées dans une chaîne puis la
+  convertit en octets pour calculer SHA-256. Le formatage et les buffers
+  intermédiaires expliquent son volume important d'allocations. Une empreinte
+  calculée directement sur la grille est une piste à mesurer.
+- **Comptage des voisins.** `neighbors` parcourt huit voisins et effectue deux
+  opérations modulo par voisin pour relier les bords, soit seize opérations
+  modulo dans le code par cellule. Son coût CPU observé justifie d'étudier ce
+  calcul. La grille `[][]bool` ajoute une indirection entre le tableau de lignes
+  et chaque ligne ; un effet sur les défauts de cache n'est pas encore mesuré.
+
+Ces observations identifient des pistes ; elles ne démontrent pas encore de gain.
+Les optimisations seront validées par les tests puis comparées sur la même machine
+et avec les mêmes paramètres.
 
 ---
 

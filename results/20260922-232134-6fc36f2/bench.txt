@@ -1,0 +1,56 @@
+goos: darwin
+goarch: arm64
+pkg: gol/internal/bench
+cpu: Apple M1
+BenchmarkStep/impl=naive/size=256-8         	     930	   1272394 ns/op	  51.51 MB/s	   72064 B/op	     257 allocs/op
+BenchmarkStep/impl=naive/size=256-8         	     820	   1294703 ns/op	  50.62 MB/s	   72064 B/op	     257 allocs/op
+BenchmarkStep/impl=naive/size=256-8         	     930	   1266004 ns/op	  51.77 MB/s	   72064 B/op	     257 allocs/op
+BenchmarkStep/impl=naive/size=256-8         	     877	   1268433 ns/op	  51.67 MB/s	   72064 B/op	     257 allocs/op
+BenchmarkStep/impl=naive/size=256-8         	     878	   1279919 ns/op	  51.20 MB/s	   72064 B/op	     257 allocs/op
+BenchmarkStep/impl=naive/size=256-8         	     831	   1284476 ns/op	  51.02 MB/s	   72064 B/op	     257 allocs/op
+BenchmarkStep/impl=naive/size=256-8         	     865	   1318729 ns/op	  49.70 MB/s	   72064 B/op	     257 allocs/op
+BenchmarkStep/impl=naive/size=256-8         	     811	   1281254 ns/op	  51.15 MB/s	   72064 B/op	     257 allocs/op
+BenchmarkStep/impl=naive/size=256-8         	     926	   1286648 ns/op	  50.94 MB/s	   72064 B/op	     257 allocs/op
+BenchmarkStep/impl=naive/size=256-8         	     849	   1291976 ns/op	  50.73 MB/s	   72064 B/op	     257 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      45	  22622342 ns/op	  46.35 MB/s	 1075840 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      45	  22526704 ns/op	  46.55 MB/s	 1075840 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      45	  22524110 ns/op	  46.55 MB/s	 1075842 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      45	  22885346 ns/op	  45.82 MB/s	 1075840 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      44	  23958227 ns/op	  43.77 MB/s	 1075840 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      45	  22619680 ns/op	  46.36 MB/s	 1075840 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      45	  22736187 ns/op	  46.12 MB/s	 1075840 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      44	  22798795 ns/op	  45.99 MB/s	 1075840 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      45	  22894446 ns/op	  45.80 MB/s	 1075840 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      45	  22769726 ns/op	  46.05 MB/s	 1075840 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=2048-8        	      12	  96374604 ns/op	  43.52 MB/s	 4243465 B/op	    2049 allocs/op
+BenchmarkStep/impl=naive/size=2048-8        	      12	  96173351 ns/op	  43.61 MB/s	 4243474 B/op	    2049 allocs/op
+BenchmarkStep/impl=naive/size=2048-8        	      12	  95718229 ns/op	  43.82 MB/s	 4243465 B/op	    2049 allocs/op
+BenchmarkStep/impl=naive/size=2048-8        	      12	  95485392 ns/op	  43.93 MB/s	 4243474 B/op	    2049 allocs/op
+BenchmarkStep/impl=naive/size=2048-8        	      12	  99560181 ns/op	  42.13 MB/s	 4243456 B/op	    2049 allocs/op
+BenchmarkStep/impl=naive/size=2048-8        	      12	  95405264 ns/op	  43.96 MB/s	 4243456 B/op	    2049 allocs/op
+BenchmarkStep/impl=naive/size=2048-8        	      12	  96211806 ns/op	  43.59 MB/s	 4243465 B/op	    2049 allocs/op
+BenchmarkStep/impl=naive/size=2048-8        	      12	  96974986 ns/op	  43.25 MB/s	 4243484 B/op	    2049 allocs/op
+BenchmarkStep/impl=naive/size=2048-8        	      12	  95872122 ns/op	  43.75 MB/s	 4243465 B/op	    2049 allocs/op
+BenchmarkStep/impl=naive/size=2048-8        	      12	  99702941 ns/op	  42.07 MB/s	 4243456 B/op	    2049 allocs/op
+BenchmarkFingerprint/impl=naive/size=1024-8 	      36	  31793821 ns/op	22208074 B/op	  785998 allocs/op
+BenchmarkFingerprint/impl=naive/size=1024-8 	      36	  31496942 ns/op	22207956 B/op	  785996 allocs/op
+BenchmarkFingerprint/impl=naive/size=1024-8 	      36	  31824322 ns/op	22208218 B/op	  785997 allocs/op
+BenchmarkFingerprint/impl=naive/size=1024-8 	      36	  31975461 ns/op	22207960 B/op	  785996 allocs/op
+BenchmarkFingerprint/impl=naive/size=1024-8 	      36	  31649451 ns/op	22207999 B/op	  785996 allocs/op
+BenchmarkFingerprint/impl=naive/size=1024-8 	      36	  31210975 ns/op	22208090 B/op	  785997 allocs/op
+BenchmarkFingerprint/impl=naive/size=1024-8 	      36	  31198052 ns/op	22208109 B/op	  785998 allocs/op
+BenchmarkFingerprint/impl=naive/size=1024-8 	      37	  31738615 ns/op	22208001 B/op	  785996 allocs/op
+BenchmarkFingerprint/impl=naive/size=1024-8 	      36	  31569409 ns/op	22207987 B/op	  785996 allocs/op
+BenchmarkFingerprint/impl=naive/size=1024-8 	      36	  32341186 ns/op	22208140 B/op	  785998 allocs/op
+BenchmarkRun/impl=naive/size=512-8          	       2	 523065938 ns/op	158960728 B/op	 4729498 allocs/op
+BenchmarkRun/impl=naive/size=512-8          	       2	 529750042 ns/op	158961412 B/op	 4729489 allocs/op
+BenchmarkRun/impl=naive/size=512-8          	       2	 521317458 ns/op	158962196 B/op	 4729508 allocs/op
+BenchmarkRun/impl=naive/size=512-8          	       2	 513396666 ns/op	158962060 B/op	 4729507 allocs/op
+BenchmarkRun/impl=naive/size=512-8          	       2	 520777479 ns/op	158962464 B/op	 4729517 allocs/op
+BenchmarkRun/impl=naive/size=512-8          	       2	 517156688 ns/op	158960816 B/op	 4729500 allocs/op
+BenchmarkRun/impl=naive/size=512-8          	       2	 539649646 ns/op	158961748 B/op	 4729503 allocs/op
+BenchmarkRun/impl=naive/size=512-8          	       2	 524984020 ns/op	158961792 B/op	 4729509 allocs/op
+BenchmarkRun/impl=naive/size=512-8          	       2	 513548271 ns/op	158961196 B/op	 4729498 allocs/op
+BenchmarkRun/impl=naive/size=512-8          	       2	 518386750 ns/op	158962508 B/op	 4729512 allocs/op
+PASS
+ok  	gol/internal/bench	76.588s

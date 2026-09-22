@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le Jeu de la Vie</title>
+<style>
+  :root{color-scheme:dark;font-family:system-ui,sans-serif;background:#101917;color:#edf4ee}
+  *{box-sizing:border-box} body{margin:0} main{max-width:1120px;margin:auto;padding:40px 24px}
+  .eyebrow{color:#9ac5ac;text-transform:uppercase;letter-spacing:.18em;font-size:12px} h1{font-size:clamp(32px,5vw,52px);letter-spacing:-.05em;margin:12px 0} .intro{color:#aebeb4;line-height:1.6;margin-bottom:30px}
+  .layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;align-items:start}
+  .board,.panel{background:#18251f;border:1px solid #33463b;border-radius:20px;padding:20px}
+  .board-header{display:flex;justify-content:space-between;gap:10px;margin-bottom:16px;font-size:13px;color:#b6c9bc}
+  canvas{display:block;width:100%;height:auto;image-rendering:pixelated;border-radius:6px;background:#101917}
+  h2{font-size:18px;margin:0 0 18px}.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}.stat{background:#101917;padding:14px;border-radius:12px}.stat span{display:block;color:#aebeb4;font-size:12px}.stat strong{display:block;font-size:29px;margin-top:5px;font-variant-numeric:tabular-nums}
+  button,select{font:inherit;border-radius:10px;border:1px solid #486252;padding:12px;background:#253b2e;color:#edf4ee;width:100%} button{cursor:pointer;margin-bottom:10px}button:hover{background:#35513e}button:disabled{opacity:.45;cursor:default}.primary{background:#b9ed98;color:#172710;border:0;font-weight:650}.primary:hover{background:#cdf9b3}label{display:block;margin:20px 0 8px;font-size:14px}input{width:100%;accent-color:#b9ed98}select{margin-bottom:12px}
+  .note{font-size:13px;line-height:1.7;color:#aebeb4}.rules{margin-top:24px;border-top:1px solid #33463b;padding-top:20px}.rules p{margin:8px 0}.error{color:#ffb9a9;min-height:1.5em;font-size:14px}footer{color:#82998b;font-size:12px;margin-top:24px}button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #e1ffd0;outline-offset:3px}
+  @media(max-width:760px){main{padding:24px 16px}.layout{grid-template-columns:1fr}.panel{padding:20px}.board{padding:12px}}
+</style>
+<main>
+  <div class="eyebrow">Laboratoire de simulation</div>
+  <h1>Le Jeu de la Vie<span style="color:#b9ed98">.</span></h1>
+  <p class="intro">Des règles simples. Des formes qui évoluent. Observe chaque génération prendre vie.</p>
+  <div class="layout">
+    <section class="board" aria-label="Simulation">
+      <div class="board-header"><span>50 × 50 cellules · bords reliés</span><span id="status" role="status">Chargement…</span></div>
+      <canvas id="grid" width="600" height="600" role="img" aria-label="Grille du Jeu de la Vie : les cellules vertes sont vivantes"></canvas>
+      <p class="note">Une cellule verte est vivante. Les cellules sombres sont mortes.</p>
+    </section>
+    <aside class="panel">
+      <h2>Ta simulation</h2>
+      <div class="stats"><div class="stat"><span>Génération</span><strong id="generation">0</strong></div><div class="stat"><span>Vivantes</span><strong id="population">0</strong></div></div>
+      <button id="play" class="primary" disabled>▶ Lecture</button>
+      <button id="step" disabled>Avancer d’une génération</button>
+      <label for="speed">Vitesse · <span id="speedValue">5</span> générations/s</label>
+      <input id="speed" type="range" min="1" max="20" value="5">
+      <label for="pattern">État initial</label>
+      <select id="pattern"><option value="random">Aléatoire · 30 % de vie</option><option value="glider">Planeur · se déplace</option><option value="blinker">Oscillateur · période 2</option><option value="block">Bloc · reste stable</option></select>
+      <button id="reset" disabled>↺ Réinitialiser</button>
+      <div id="error" class="error" role="alert"></div>
+      <div class="rules"><h2>Les règles</h2><p class="note">Une cellule naît avec exactement <b>3 voisins vivants</b>.</p><p class="note">Elle survit avec <b>2 ou 3 voisins</b>. Sinon, elle meurt.</p><p class="note">Les bords se rejoignent : un motif peut traverser la grille.</p></div>
+    </aside>
+  </div>
+  <footer>Calculé par le moteur Go « naive » · La réinitialisation reproduit le même état initial · Les états stables et les cycles continuent à être affichés.</footer>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const ctx = $('grid').getContext('2d');
+let cells = [], generation = 0, running = false, busy = false, timer;
+function controls() {
+  $('play').textContent = running ? 'Ⅱ Pause' : '▶ Lecture';
+  $('play').disabled = !cells.length;
+  $('step').disabled = busy || running || !cells.length;
+  $('reset').disabled = busy;
+  $('pattern').disabled = busy;
+  $('status').textContent = running ? '● En cours' : '● En pause';
+}
+function draw(population) {
+  ctx.fillStyle = '#101917'; ctx.fillRect(0,0,600,600);
+  for (let i=0;i<cells.length;i++) {
+    ctx.fillStyle = cells[i] ? '#b9ed98' : '#203027';
+    ctx.fillRect((i%50)*12,Math.floor(i/50)*12,11,11);
+  }
+  $('population').textContent = population;
+  $('generation').textContent = generation;
+}
+function pause() { running = false; clearTimeout(timer); controls(); }
+async function request(action) {
+  if (busy) return;
+  busy = true; controls(); $('error').textContent = '';
+  try {
+    const response = await fetch('/api/simulation', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action, pattern:$('pattern').value, seed:42, cells:action==='step'?cells:undefined}),
+      signal:AbortSignal.timeout(10000)
+    });
+    if (!response.ok) throw new Error('Erreur du serveur ('+response.status+').');
+    const data = await response.json();
+    cells = data.cells; generation = action==='reset' ? 0 : generation+1;
+    draw(data.population);
+  } catch (error) {
+    pause(); $('error').textContent = 'Impossible de charger la simulation. Vérifie que le serveur est lancé, puis réinitialise.';
+  } finally {
+    busy = false; controls();
+    if (running) timer = setTimeout(() => request('step'), 1000/Number($('speed').value));
+  }
+}
+$('play').onclick = () => {
+  if (running) { pause(); return; }
+  running = true; controls(); if (!busy) request('step');
+};
+$('step').onclick = () => request('step');
+$('reset').onclick = () => { pause(); request('reset'); };
+$('pattern').onchange = () => { pause(); request('reset'); };
+$('speed').oninput = () => $('speedValue').textContent = $('speed').value;
+request('reset');
+</script>
+</html>

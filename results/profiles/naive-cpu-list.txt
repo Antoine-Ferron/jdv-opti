@@ -1,0 +1,61 @@
+Total: 1.96s
+ROUTINE ======================== gol/internal/naive.(*Sim).Fingerprint in /Users/Cherif/Documents/jdv-opti/internal/naive/naive.go
+      10ms      220ms (flat, cum) 11.22% of Total
+         .          .    117:func (s *Sim) Fingerprint() uint64 {
+         .          .    118:	var sb strings.Builder
+         .          .    119:	for y := 0; y < s.height; y++ {
+         .          .    120:		for x := 0; x < s.width; x++ {
+      10ms       10ms    121:			if s.grid[y][x] {
+         .      200ms    122:				sb.WriteString(fmt.Sprintf("%d,%d;", x, y))
+         .          .    123:			}
+         .          .    124:		}
+         .          .    125:	}
+         .       10ms    126:	sum := sha256.Sum256([]byte(sb.String()))
+         .          .    127:	return binary.LittleEndian.Uint64(sum[:8])
+         .          .    128:}
+ROUTINE ======================== gol/internal/naive.(*Sim).Step in /Users/Cherif/Documents/jdv-opti/internal/naive/naive.go
+     120ms      700ms (flat, cum) 35.71% of Total
+         .          .     83:func (s *Sim) Step() {
+         .          .     84:	next := make([][]bool, s.height) // [D2] nouvelle grille à chaque génération
+         .          .     85:	s.changed = false
+         .          .     86:	for y := 0; y < s.height; y++ {
+         .       10ms     87:		next[y] = make([]bool, s.width)
+      20ms       20ms     88:		for x := 0; x < s.width; x++ {
+         .      570ms     89:			n := s.neighbors(x, y)
+      20ms       20ms     90:			alive := s.grid[y][x]
+      40ms       40ms     91:			nextAlive := n == 3 || (alive && n == 2)
+      30ms       30ms     92:			next[y][x] = nextAlive
+         .          .     93:			if nextAlive != alive {
+      10ms       10ms     94:				s.changed = true
+         .          .     95:			}
+         .          .     96:		}
+         .          .     97:	}
+         .          .     98:	s.grid = next
+         .          .     99:	s.generation++
+ROUTINE ======================== gol/internal/naive.(*Sim).neighbors in /Users/Cherif/Documents/jdv-opti/internal/naive/naive.go
+     570ms      570ms (flat, cum) 29.08% of Total
+      10ms       10ms     60:func (s *Sim) neighbors(x, y int) int {
+         .          .     61:	n := 0
+      50ms       50ms     62:	for dy := -1; dy <= 1; dy++ {
+     220ms      220ms     63:		for dx := -1; dx <= 1; dx++ {
+      20ms       20ms     64:			if dx == 0 && dy == 0 {
+         .          .     65:				continue
+         .          .     66:			}
+         .          .     67:			nx, ny := x+dx, y+dy
+      40ms       40ms     68:			if s.wrap {
+      30ms       30ms     69:				nx = (nx + s.width) % s.width
+      40ms       40ms     70:				ny = (ny + s.height) % s.height
+         .          .     71:			} else if nx < 0 || ny < 0 || nx >= s.width || ny >= s.height {
+         .          .     72:				continue
+         .          .     73:			}
+     110ms      110ms     74:			if s.grid[ny][nx] {
+         .          .     75:				n++
+         .          .     76:			}
+         .          .     77:		}
+         .          .     78:	}
+      50ms       50ms     79:	return n
+         .          .     80:}
+         .          .     81:
+         .          .     82:// Step calcule la génération suivante.
+         .          .     83:func (s *Sim) Step() {
+         .          .     84:	next := make([][]bool, s.height) // [D2] nouvelle grille à chaque génération

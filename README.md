@@ -83,3 +83,24 @@ petites allocations ; le profil coûte alors du temps et cette exécution ne ser
 1. Copier `internal/naive` vers `internal/<nom>`, renommer le package et l'appel `life.Register("<nom>", …)`.
 2. Ajouter `_ "gol/internal/<nom>"` dans `internal/engines/engines.go`.
 3. `make test`, puis `make bench` : la nouvelle version apparaît automatiquement dans toutes les mesures.
+
+## Visualisation interactive
+
+```bash
+make web
+```
+
+Ouvrir **http://127.0.0.1:8081** dans un navigateur. La page affiche une grille
+de 50 × 50 cellules avec lecture/pause, avance d'une génération, vitesse réglable
+et quatre états initiaux : aléatoire, planeur, oscillateur et bloc stable.
+Réinitialiser reproduit le motif sélectionné (graine 42 pour l'aléatoire).
+Arrêter le serveur avec `Ctrl+C`. Pour changer de port :
+`go run ./cmd/web -addr 127.0.0.1:8082`.
+
+La page est embarquée dans `cmd/web` et appelle le moteur Go `naive` via HTTP.
+Chaque onglet conserve sa propre grille ; le serveur calcule une génération par
+requête. La vitesse choisie est une cadence cible, limitée par le temps de calcul
+et les échanges HTTP. L'animation continue même si un état se répète.
+Utiliser les commandes de benchmark habituelles pour mesurer les performances :
+la visualisation reconstruit le moteur à chaque requête et ajoute le coût du réseau
+local et de l'affichage. Elle ne fournit pas une mesure de performance du moteur.

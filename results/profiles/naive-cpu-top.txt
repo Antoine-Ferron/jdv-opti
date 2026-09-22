@@ -1,0 +1,22 @@
+File: gol
+Type: cpu
+Time: 2026-09-21 16:34:48 CEST
+Duration: 2.32s, Total samples = 1.96s (84.40%)
+Showing nodes accounting for 1.84s, 93.88% of 1.96s total
+Showing top 15 nodes out of 118
+      flat  flat%   sum%        cum   cum%
+     0.84s 42.86% 42.86%      0.84s 42.86%  runtime.madvise
+     0.57s 29.08% 71.94%      0.57s 29.08%  gol/internal/naive.(*Sim).neighbors
+     0.12s  6.12% 78.06%      0.70s 35.71%  gol/internal/naive.(*Sim).Step
+     0.08s  4.08% 82.14%      0.08s  4.08%  runtime.kevent
+     0.07s  3.57% 85.71%      0.07s  3.57%  fmt.(*fmt).fmtInteger
+     0.02s  1.02% 86.73%      0.09s  4.59%  fmt.(*pp).printArg
+     0.02s  1.02% 87.76%      0.05s  2.55%  runtime.mallocgcTinySC2
+     0.02s  1.02% 88.78%      0.02s  1.02%  runtime.pthread_cond_signal
+     0.02s  1.02% 89.80%      0.02s  1.02%  runtime.pthread_cond_wait
+     0.02s  1.02% 90.82%      0.02s  1.02%  runtime.pthread_kill
+     0.02s  1.02% 91.84%      0.02s  1.02%  runtime.usleep
+     0.01s  0.51% 92.35%      0.01s  0.51%  crypto/internal/fips140/sha256.blockSHA2
+     0.01s  0.51% 92.86%      0.10s  5.10%  fmt.(*pp).doPrintf
+     0.01s  0.51% 93.37%      0.12s  6.12%  fmt.Sprintf
+     0.01s  0.51% 93.88%      0.22s 11.22%  gol/internal/naive.(*Sim).Fingerprint

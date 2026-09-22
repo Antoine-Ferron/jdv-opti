@@ -1,0 +1,37 @@
+goos: darwin
+goarch: arm64
+pkg: gol/internal/bench
+cpu: Apple M1
+                        │    naive    │
+                        │   sec/op    │
+Step/size=256-8           1.283m ± 1%
+Step/size=1024-8          22.75m ± 1%
+Step/size=2048-8          96.19m ± 4%
+Fingerprint/size=1024-8   31.69m ± 2%
+Run/size=512-8            521.0m ± 2%
+geomean                   34.14m
+
+                 │    naive     │
+                 │     B/s      │
+Step/size=256-8    48.72Mi ± 1%
+Step/size=1024-8   43.95Mi ± 1%
+Step/size=2048-8   41.58Mi ± 3%
+geomean            44.65Mi
+
+                        │    naive     │
+                        │     B/op     │
+Step/size=256-8           70.38Ki ± 0%
+Step/size=1024-8          1.026Mi ± 0%
+Step/size=2048-8          4.047Mi ± 0%
+Fingerprint/size=1024-8   21.18Mi ± 0%
+Run/size=512-8            151.6Mi ± 0%
+geomean                   3.912Mi
+
+                        │    naive    │
+                        │  allocs/op  │
+Step/size=256-8            257.0 ± 0%
+Step/size=1024-8          1.025k ± 0%
+Step/size=2048-8          2.049k ± 0%
+Fingerprint/size=1024-8   786.0k ± 0%
+Run/size=512-8            4.730M ± 0%
+geomean                   18.22k

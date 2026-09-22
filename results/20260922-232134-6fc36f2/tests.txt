@@ -1,0 +1,7 @@
+?   	gol/cmd/gol	[no test files]
+ok  	gol/cmd/web	0.234s
+ok  	gol/internal/bench	0.397s [no tests to run]
+?   	gol/internal/engines	[no test files]
+?   	gol/internal/life	[no test files]
+?   	gol/internal/lifetest	[no test files]
+ok  	gol/internal/naive	0.664s

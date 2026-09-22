@@ -1,0 +1,13 @@
+File: gol
+Type: alloc_space
+Time: 2026-09-21 16:34:50 CEST
+Showing nodes accounting for 686.16MB, 99.49% of 689.65MB total
+Dropped 63 nodes (cum <= 3.45MB)
+      flat  flat%   sum%        cum   cum%
+  379.44MB 55.02% 55.02%   379.44MB 55.02%  strings.(*Builder).WriteString (inline)
+  178.92MB 25.94% 80.96%   634.63MB 92.02%  gol/internal/naive.(*Sim).Fingerprint
+   76.06MB 11.03% 91.99%    76.27MB 11.06%  fmt.Sprintf
+   51.74MB  7.50% 99.49%    51.74MB  7.50%  gol/internal/naive.(*Sim).Step
+         0     0% 99.49%   686.37MB 99.52%  gol/internal/life.Run
+         0     0% 99.49%   689.59MB   100%  main.main
+         0     0% 99.49%   689.59MB   100%  runtime.main
