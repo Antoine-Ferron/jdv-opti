@@ -1,4 +1,4 @@
-# Rapport d'audit de performance — Jeu de la vie
+# Rapport d'audit de performance — Simulation d'incendie
 
 > **Équipe :** … — **Session :** E42 — **Dépôt :** … (commit final : `…`)
 >
@@ -51,7 +51,7 @@ Source : `results/env-2026-09-22.md` (généré par `make env`, complété des r
 
 - Outil : Hyperfine `-N --warmup 3 --runs 15`, binaire exécuté sans shell intermédiaire.
 - Justification du warmup : cache disque du binaire, caches CPU, stabilisation de la fréquence.
-- Charge de travail : grille 1024×1024, graine 42, densité 0,3, 50 générations. **Identique pour toutes les versions.**
+- Charge de travail : carte 1024×1024, graine 42, 64 foyers, 50 tours. **Identique pour toutes les versions.**
 - Isolation du bruit : navigateur/IDE fermés, machine sur secteur, charge système vérifiée avant chaque campagne (voir `env.md`), [pinning `taskset` si utilisé].
 - Micro-benchmarks : `go test -bench -benchmem -count 10`, comparés avec benchstat (intervalle de confiance, test de significativité).
 

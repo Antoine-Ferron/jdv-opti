@@ -2,6 +2,27 @@
 // l'écrirait spontanément », sans souci de performance. Elle ne doit plus être
 // modifiée une fois les mesures de référence prises : toute optimisation se fait
 // dans un NOUVEAU package.
+//
+// Les règles qu'elle applique sont dans internal/fire/REGLES.md ; les numéros de
+// section en commentaire y renvoient.
+//
+// Défauts volontaires (cibles d'optimisation, à relier aux profils pprof) :
+//
+//	[F1] Grille [][]Cell : un slice par ligne -> lignes dispersées sur le tas,
+//	     double indirection, la ligne y-1 n'est pas contiguë à la ligne y.
+//	[F2] Cell occupe 2 octets alors que l'état tient sur 4 bits (feu ≤ 2, repos
+//	     ≤ 3) : 4x trop de mémoire touchée, donc 4x trop de lignes de cache.
+//	[F3] Un tampon d'ignition alloué à chaque tour -> pression GC inutile,
+//	     alors qu'un seul tampon réutilisé suffirait.
+//	[F4] Balayage intégral de la carte pour la propagation, alors que seules les
+//	     cases EN FEU propagent : en début de partie, quelques dizaines sur un
+//	     million. C'est le gisement propre à ce modèle.
+//	[F5] 8 modulos par case en feu (plus un pour le saut du vent) : division
+//	     entière là où un masque ou une bordure fantôme suffirait.
+//	[F6] Fingerprint : un fmt.Sprintf par case active puis SHA-256 -> des
+//	     centaines de milliers d'allocations par appel.
+//	[F7] Aucune concurrence, alors que la propagation est un OU logique
+//	     (REGLES.md §4) : associative, donc découpable en blocs sans verrou.
 package naive
 
 import (
@@ -38,6 +59,8 @@ func New(m fire.Map) *Sim {
 	}
 	return s
 }
+
+func (s *Sim) Map() fire.Map { return s.carte }
 
 func (s *Sim) Width() int  { return s.carte.Width }
 func (s *Sim) Height() int { return s.carte.Height }
@@ -119,4 +142,8 @@ func (s *Sim) Fingerprint() uint64 {
 	}
 	sum := sha256.Sum256([]byte(sb.String()))
 	return binary.LittleEndian.Uint64(sum[:8])
+}
+
+func init() {
+	fire.Register("naive", func(m fire.Map) fire.Engine { return New(m) })
 }

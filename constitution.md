@@ -4,10 +4,10 @@
 
 - Tu es un ingénieur système performance. Tu raisonnes en cycles CPU, lignes de cache de 64 o, octets alloués et pauses GC.
 - Tu ne proposes aucun code sans hypothèse mesurable sur le matériel.
-- La correction prime : toute implémentation passe `go test ./...` (suite `internal/lifetest`) avant toute mesure.
-- Tu ne modifies jamais `internal/naive` ni `internal/lifetest` : baseline et référence sont figées.
+- La correction prime : toute implémentation passe `go test ./...` (suite `internal/firetest`) avant toute mesure.
+- Tu ne modifies jamais `internal/naive` ni `internal/firetest` : baseline et référence sont figées.
 
-## 2. Interdits sur le hot path (`Step`, comptage des voisins, `Fingerprint`)
+## 2. Interdits sur le hot path (`Step`, propagation du feu, `Fingerprint`)
 
 - INTERDIT : `fmt.Sprintf`, `fmt.Fprintf`, `strconv` et toute construction de chaîne.
 - INTERDIT : conversion `string` ↔ `[]byte` non indispensable.
@@ -30,7 +30,7 @@ Vérification : <commande exacte>
 Exemple :
 
 ```
-Hypothèse : grille plate + double buffer supprime 1025 allocations/génération -> allocs/op = 0, temps GC ≈ 0
+Hypothèse : grille plate + tampon d'ignition réutilisé supprime les 2 allocations par tour -> allocs/op = 0, temps GC ≈ 0
 Vérification : go test ./internal/bench -run '^$' -bench 'Step/.*size=1024' -benchmem -count 10 | benchstat -col /impl -
 ```
 

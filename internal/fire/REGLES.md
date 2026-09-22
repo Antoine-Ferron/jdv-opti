@@ -53,10 +53,20 @@ Commutatif, associatif, indépendant de l'ordre d'évaluation — donc décompos
 sans synchronisation.
 
 Conséquence sur la durée d'un incendie : une plaine embrasée redevient inflammable 3 tours
-plus tard (1 de combustion + 2 de repos), alors que le front n'a avancé que de 3 cases. **Le
-feu peut donc revenir sur ses pas**, et une partie atteint en général un régime entretenu
-plutôt que de s'éteindre.
+plus tard (1 de combustion, 2 de repos), une forêt 5 tours. Ce que devient l'incendie dépend
+alors du terrain — et cela se mesure, sur une carte 200×200 :
 
+- **Terrain homogène, ou hétérogène mais sans vent** : le front s'éloigne d'une case par tour
+  et ne revient jamais. L'incendie s'éteint après avoir parcouru la carte, en une centaine de
+  tours, qu'il y ait des lacs, des massifs forestiers, ou les deux.
+- **Vent et terrain hétérogène** — le réglage par défaut : le saut du vent allume des cases
+  avec un tour d'avance, les obstacles et les durées de combustion inégales entretiennent ce
+  décalage, et des fronts désynchronisés finissent par se rallumer mutuellement. L'incendie
+  atteint un **régime entretenu** : après 4000 tours, un quart de la carte brûle encore.
+
+Ni le vent seul sur de la plaine pure, ni l'hétérogénéité seule ne suffisent : il faut les
+deux. Pour les mesures de performance, le réglage par défaut donne donc une charge de calcul
+stable, ce qui est exactement ce qu'on veut.
 ## 5. Les cibles d'une case en feu
 
 **Case sans vent** → ses 8 voisins de Moore, à distance 1. L'eau n'étant jamais combustible,

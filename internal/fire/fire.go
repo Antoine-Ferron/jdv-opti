@@ -6,6 +6,12 @@
 // doit la passer avant d'être mesurée.
 package fire
 
+import (
+	"io"
+	"sort"
+	"time"
+)
+
 // Terrain est la nature immuable d'une case.
 type Terrain uint8
 
@@ -96,6 +102,8 @@ func Mod(a, n int) int {
 type Engine interface {
 	// Step calcule le tour suivant.
 	Step()
+	// Map renvoie la carte immuable sur laquelle la simulation tourne.
+	Map() Map
 	// Fire renvoie le nombre de tours de combustion restants de (x, y), 0 si elle n'est pas en feu.
 	Fire(x, y int) uint8
 	// Rest renvoie le nombre de tours de repos restants de (x, y), 0 si elle est disponible.
@@ -114,24 +122,83 @@ type Factory func(m Map) Engine
 // Options pilote Run.
 type Options struct {
 	Turns int // nombre maximal de tours
+
+	// Affichage console : démo et mise au point, à laisser nil pour les mesures.
+	Render      io.Writer
+	RenderDelay time.Duration
 }
 
 // Result résume une exécution.
 type Result struct {
-	Turns   int  // tours effectivement calculés
-	Extinct bool // vrai si l'incendie s'est éteint de lui-même
+	Turns   int   // tours effectivement calculés
+	Extinct bool  // vrai si l'incendie s'est éteint de lui-même
+	Err     error // première erreur d'affichage rencontrée, nil sinon
 }
 
 // Run déroule la simulation jusqu'à extinction ou épuisement des tours (§6).
 func Run(e Engine, opt Options) Result {
 	var res Result
+	if err := dessine(e, opt); err != nil {
+		res.Err = err
+		return res
+	}
 	for res.Turns < opt.Turns {
 		e.Step()
 		res.Turns++
+		if err := dessine(e, opt); err != nil {
+			res.Err = err
+			return res
+		}
 		if e.Burning() == 0 {
 			res.Extinct = true
 			break
 		}
 	}
 	return res
+}
+
+// dessine affiche une image si Run a reçu une sortie, et ne fait rien sinon :
+// le chemin mesuré ne paie pas le rendu.
+func dessine(e Engine, opt Options) error {
+	if opt.Render == nil {
+		return nil
+	}
+	// Curseur en haut à gauche : chaque image se superpose à la précédente au
+	// lieu de faire défiler le terminal.
+	if _, err := io.WriteString(opt.Render, "[H"); err != nil {
+		return err
+	}
+	if err := Render(opt.Render, e); err != nil {
+		return err
+	}
+	time.Sleep(opt.RenderDelay)
+	return nil
+}
+
+// registry associe un nom à une implémentation. Ajouter une version = créer un
+// package, l'enregistrer dans son init(), et l'importer depuis internal/engines.
+var registry = map[string]Factory{}
+
+// Register enregistre une implémentation sous un nom (ex : "naive", "flat").
+func Register(name string, f Factory) {
+	if _, dup := registry[name]; dup {
+		panic("fire: implémentation enregistrée deux fois : " + name)
+	}
+	registry[name] = f
+}
+
+// Get renvoie la fabrique d'une implémentation.
+func Get(name string) (Factory, bool) {
+	f, ok := registry[name]
+	return f, ok
+}
+
+// Names renvoie les implémentations enregistrées, triées.
+func Names() []string {
+	names := make([]string, 0, len(registry))
+	for n := range registry {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	return names
 }
