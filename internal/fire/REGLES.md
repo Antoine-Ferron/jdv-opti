@@ -100,7 +100,8 @@ l'amont. Le vent est un coup de pouce local, pas un front directionnel.
   le terrain. Leur nombre est réglable (défaut : 1).
 - Pas de foudre en cours de partie : l'allumage est uniquement initial.
 - La simulation s'arrête quand plus aucune case n'est en feu, quand le nombre de tours
-  demandé est atteint, ou quand un état déjà vu réapparaît (arrêt précoce sur cycle).
+  demandé est atteint. Il n'y a pas d'arrêt sur cycle : un incendie entretenu ne repasse
+  pas par un état déjà vu, et le détecter coûterait une empreinte par tour pour rien.
 
 ## 7. Génération de la carte
 
