@@ -22,7 +22,8 @@ var fleches = [8]string{"→", "↗", "↑", "↖", "←", "↙", "↓", "↘"}
 //
 // Le feu prime sur les cendres, qui priment sur le vent, qui prime sur le
 // terrain : on veut voir d'abord ce qui bouge.
-func Render(out io.Writer, m Map, e Engine) error {
+func Render(out io.Writer, e Engine) error {
+	m := e.Map()
 	buf := make([]byte, 0, len(m.Terrain)*7+m.Height)
 	for y := 0; y < m.Height; y++ {
 		for x := 0; x < m.Width; x++ {
