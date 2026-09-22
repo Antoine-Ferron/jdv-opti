@@ -1,0 +1,40 @@
+# gol/internal/flat
+internal/flat/flat.go:32:6: can inline New
+internal/flat/flat.go:16:24: can inline init.0.func1
+internal/flat/flat.go:15:6: can inline init.0
+internal/flat/flat.go:40:6: can inline (*Sim).Width
+internal/flat/flat.go:41:6: can inline (*Sim).Height
+internal/flat/flat.go:43:6: can inline (*Sim).Alive
+internal/flat/flat.go:88:6: can inline (*Sim).Population
+internal/flat/flat.go:16:77: inlining call to New
+internal/flat/flat.go:16:15: inlining call to life.Register
+internal/flat/flat.go:107:19: inlining call to strings.(*Builder).WriteString
+internal/flat/flat.go:111:39: inlining call to strings.(*Builder).String
+internal/flat/flat.go:112:35: inlining call to binary.littleEndian.Uint64
+internal/flat/flat.go:107:19: inlining call to strings.(*Builder).copyCheck
+internal/flat/flat.go:107:19: inlining call to abi.NoEscape
+internal/flat/flat.go:16:39: cells does not escape
+internal/flat/flat.go:16:77: &Sim{...} escapes to heap
+internal/flat/flat.go:16:77: make([]bool, w * h) escapes to heap
+internal/flat/flat.go:16:77: make([]bool, w * h) escapes to heap
+internal/flat/flat.go:16:24: func literal escapes to heap
+internal/flat/flat.go:16:15: "life: implémentation enregistrée deux fois : " + life.name escapes to heap
+internal/flat/flat.go:16:15: "life: implémentation enregistrée deux fois : " + life.name escapes to heap
+internal/flat/flat.go:32:20: cells does not escape
+internal/flat/flat.go:33:7: &Sim{...} escapes to heap
+internal/flat/flat.go:34:15: make([]bool, w * h) escapes to heap
+internal/flat/flat.go:35:15: make([]bool, w * h) escapes to heap
+internal/flat/flat.go:40:7: s does not escape
+internal/flat/flat.go:41:7: s does not escape
+internal/flat/flat.go:43:7: s does not escape
+internal/flat/flat.go:46:7: s does not escape
+internal/flat/flat.go:83:17: (*Sim).Step ignoring self-assignment in s.grid, s.next = next, s.grid
+internal/flat/flat.go:69:7: leaking param content: s
+internal/flat/flat.go:88:7: s does not escape
+internal/flat/flat.go:102:7: s does not escape
+internal/flat/flat.go:107:31: ... argument does not escape
+internal/flat/flat.go:107:42: x escapes to heap
+internal/flat/flat.go:107:45: y escapes to heap
+internal/flat/flat.go:107:19: "strings: illegal use of non-zero Builder copied by value" escapes to heap
+internal/flat/flat.go:107:19: append escapes to heap
+internal/flat/flat.go:111:39: ([]byte)(~r0) does not escape

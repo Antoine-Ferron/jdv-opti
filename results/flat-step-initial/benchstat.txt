@@ -1,0 +1,19 @@
+goos: darwin
+goarch: arm64
+pkg: gol/internal/bench
+cpu: Apple M1
+                 │    flat     │               naive                │
+                 │   sec/op    │   sec/op     vs base               │
+Step/size=1024-8   21.88m ± 2%   22.48m ± 0%  +2.72% (p=0.002 n=10)
+
+                 │     flat     │                naive                │
+                 │     B/s      │     B/s       vs base               │
+Step/size=1024-8   45.70Mi ± 2%   44.49Mi ± 0%  -2.65% (p=0.001 n=10)
+
+                 │     flat     │             naive              │
+                 │     B/op     │     B/op      vs base          │
+Step/size=1024-8   0.000Mi ± 0%   1.026Mi ± 0%  ? (p=0.000 n=10)
+
+                 │    flat     │             naive             │
+                 │  allocs/op  │  allocs/op   vs base          │
+Step/size=1024-8   0.000k ± 0%   1.025k ± 0%  ? (p=0.000 n=10)

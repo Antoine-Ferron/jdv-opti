@@ -1,0 +1,26 @@
+goos: darwin
+goarch: arm64
+pkg: gol/internal/bench
+cpu: Apple M1
+BenchmarkStep/impl=flat/size=1024-8         	      51	  22035999 ns/op	  47.58 MB/s	       0 B/op	       0 allocs/op
+BenchmarkStep/impl=flat/size=1024-8         	      49	  30975087 ns/op	  33.85 MB/s	       0 B/op	       0 allocs/op
+BenchmarkStep/impl=flat/size=1024-8         	      48	  21698938 ns/op	  48.32 MB/s	       0 B/op	       0 allocs/op
+BenchmarkStep/impl=flat/size=1024-8         	      49	  21680835 ns/op	  48.36 MB/s	       0 B/op	       0 allocs/op
+BenchmarkStep/impl=flat/size=1024-8         	      48	  21728845 ns/op	  48.26 MB/s	       0 B/op	       0 allocs/op
+BenchmarkStep/impl=flat/size=1024-8         	      48	  22336140 ns/op	  46.95 MB/s	       0 B/op	       0 allocs/op
+BenchmarkStep/impl=flat/size=1024-8         	      49	  22344244 ns/op	  46.93 MB/s	       0 B/op	       0 allocs/op
+BenchmarkStep/impl=flat/size=1024-8         	      48	  21712451 ns/op	  48.29 MB/s	       0 B/op	       0 allocs/op
+BenchmarkStep/impl=flat/size=1024-8         	      49	  21709064 ns/op	  48.30 MB/s	       0 B/op	       0 allocs/op
+BenchmarkStep/impl=flat/size=1024-8         	      49	  22058243 ns/op	  47.54 MB/s	       0 B/op	       0 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      46	  23287652 ns/op	  45.03 MB/s	 1075848 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      46	  22471846 ns/op	  46.66 MB/s	 1075844 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      46	  22443165 ns/op	  46.72 MB/s	 1075842 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      46	  22498913 ns/op	  46.61 MB/s	 1075845 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      46	  22470326 ns/op	  46.66 MB/s	 1075840 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      46	  22465178 ns/op	  46.68 MB/s	 1075842 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      46	  22582618 ns/op	  46.43 MB/s	 1075847 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      46	  22481755 ns/op	  46.64 MB/s	 1075847 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      46	  22523178 ns/op	  46.56 MB/s	 1075842 B/op	    1025 allocs/op
+BenchmarkStep/impl=naive/size=1024-8        	      46	  22463816 ns/op	  46.68 MB/s	 1075844 B/op	    1025 allocs/op
+PASS
+ok  	gol/internal/bench	23.224s

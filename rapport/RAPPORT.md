@@ -177,6 +177,102 @@ Une entrée par étape, toujours au même format :
 > - **Résultat :** avant → après (benchstat, avec p-value) ; allocs/op avant → après.
 > - **Explication physique :** …
 
+### Étape 1 — Grille contiguë et deux buffers (`flat`)
+
+**Hypothèse :** remplacer les lignes séparées par une grille contiguë et
+réutiliser deux buffers supprime les 1 025 allocations de `Step` par génération
+sur une grille 1024 × 1024. Le gain de temps doit être mesuré.
+
+**Modification :** nouveau package `internal/flat`, enregistré dans le registre
+commun. `Step` remplit le second buffer puis échange les deux grilles. La baseline
+`naive` et la référence `lifetest` restent intactes. Pour isoler cette étape, les
+modulos et le calcul SHA-256 à partir de coordonnées formatées sont conservés :
+exception expérimentale aux interdits du hot path de `constitution.md`, limitée
+à cette comparaison. Les allocations de `Fingerprint` restent donc présentes.
+
+**Validation :** `go test ./... -count=1` passe, incluant la suite de conformité
+pour `flat` et un test d'indépendance des buffers vis-à-vis de l'entrée.
+
+**Commande de mesure :**
+
+```bash
+go test ./internal/bench -run '^$' -bench 'BenchmarkStep/impl=.*/size=1024$' -benchmem -count 10
+benchstat -col /impl results/flat-step-initial/bench.txt
+go build -gcflags=-m ./internal/flat
+```
+
+**Première mesure locale sur Apple M1 :**
+
+| Moteur | Temps médian par génération | Octets alloués/génération | Allocations/génération |
+|---|---:|---:|---:|
+| naive | 22,48 ms | Environ 1 075 840 o | 1 025 |
+| flat | 21,88 ms | 0 o | 0 |
+
+Sources : [mesures brutes](../results/flat-step-initial/bench.txt),
+[benchstat](../results/flat-step-initial/benchstat.txt),
+[analyse d'échappement](../results/flat-step-initial/escape.txt).
+
+Le temps de `flat` est inférieur d'environ 2,65 % à celui de `naive`
+(p = 0,002, dix mesures par moteur). Attention : le tableau benchstat place
+`flat` en référence et affiche donc `naive` à +2,72 % ; le dénominateur diffère.
+L'objectif de zéro allocation dans `Step` est atteint. Les allocations initiales
+des deux buffers sont hors du chronométrage de ce micro-benchmark ; cette
+propriété ne s'étend ni à `New`, ni à `Fingerprint`, ni à la simulation complète.
+
+La réutilisation supprime la création et l'abandon d'une grille à chaque étape.
+L'analyse d'échappement documente les allocations du constructeur et de
+l'empreinte ; aucun gain de pauses GC ou de défauts de cache n'est établi ici.
+Les mesures ont été réalisées avant commit sur la branche `cherif/optim-flat`.
+Le code et les preuves sont conservés ensemble dans le commit intitulé
+« Ajoute le moteur flat et documente sa comparaison à naive ».
+
+**Campagne complète :** `make bench`, dossier
+[`20260922-235916-ae93e40`](../results/20260922-235916-ae93e40/).
+Le suffixe `ae93e40` désigne le HEAD avant commit des modifications mesurées,
+et non un commit contenant déjà `flat`.
+
+Les [tests de conformité](../results/20260922-235916-ae93e40/tests.txt)
+passent. Les [micro-benchmarks](../results/20260922-235916-ae93e40/benchstat.txt)
+confirment les résultats suivants (médianes, dix mesures par moteur) :
+
+| Opération | naive | flat | Réduction du temps par rapport à naive |
+|---|---:|---:|---:|
+| Step, 256 × 256 | 1,273 ms | 1,229 ms | Environ 3,4 % |
+| Step, 1024 × 1024 | 22,37 ms | 21,56 ms | Environ 3,6 % |
+| Step, 2048 × 2048 | 95,46 ms | 91,98 ms | Environ 3,6 % |
+| Fingerprint, 1024 × 1024 | 31,20 ms | 30,98 ms | Environ 0,7 % |
+| Run, 512 × 512, 50 générations maximum | 511,5 ms | 501,0 ms | Environ 2,1 % |
+
+Les différences de temps sont significatives dans cette campagne : p = 0,001
+pour Step à 256, et p < 0,001 pour les autres lignes (affichées `p=0.000`
+par benchstat après arrondi). Les pourcentages ci-dessus prennent `naive` comme
+référence, contrairement aux colonnes de benchstat qui prennent `flat`.
+
+`Step` n'alloue plus sur les trois tailles testées. En revanche, `Fingerprint`
+conserve environ 786 000 allocations et 22,2 Mo par appel. Pour `Run` à 512,
+le volume alloué passe d'environ 159,0 Mo à 145,4 Mo, soit une baisse de 8,5 %.
+La suppression des allocations de grille ne rend donc pas la simulation complète
+sans allocation.
+
+La [mesure Hyperfine](../results/20260922-235916-ae93e40/hyperfine-stats.md)
+compare les exécutions complètes sur 1024 × 1024 et 50 générations maximum :
+
+| Moteur | Moyenne | Médiane | Écart-type | CV |
+|---|---:|---:|---:|---:|
+| naive | 2,1576 s | 2,1500 s | 0,0408 s | 1,9 % |
+| flat | 2,0687 s | 2,0596 s | 0,0148 s | 0,7 % |
+
+Le temps moyen diminue de 4,12 %, soit une accélération de ×1,043.
+Ce rapport de moyennes n'est pas une p-value ; les tests statistiques ci-dessus
+concernent les micro-benchmarks. Les valeurs `×1.0` du fichier de statistiques
+sont arrondies à une décimale et prennent le premier moteur, `flat`, comme
+référence. La comparaison retenue ici utilise `naive` de la même campagne,
+pas les 2,1231 s de la campagne précédente.
+
+Le gain global reste modeste : le comptage des voisins et la construction de
+l'empreinte sont conservés. La prochaine hypothèse à tester concerne la
+suppression du formatage et des allocations de `Fingerprint`.
+
 ### 3.1 Mémoire & localité de cache
 
 - Grille plate `[]uint8` + double buffering (zéro allocation par génération).
@@ -222,16 +318,18 @@ make bench   # env + tests + go bench + hyperfine + benchstat -> results/<date>-
 
 ### 5.2 Tableau de synthèse
 
-Coller `results/<run>/benchstat.txt` (benchstat `-col /impl`) et le tableau Hyperfine.
+Sources : [benchstat](../results/20260922-235916-ae93e40/benchstat.txt)
+et [Hyperfine](../results/20260922-235916-ae93e40/hyperfine-stats.md).
 
-| Version | Temps (1024², 50 gén.) | Débit (cellules/s) | allocs/génération | Gain cumulé |
-|---|---|---|---|---|
-| naive (baseline) | | | | ×1 |
-| flat + double buffer | | | 0 | |
-| bitpack | | | 0 | |
-| parallel (N workers) | | | | |
+| Version | Temps moyen (1024², 50 générations maximum) | Allocations par Step (1024²) | Accélération globale relative à naive |
+|---|---:|---:|---:|
+| naive | 2,1576 s | 1 025 | ×1,000 |
+| flat + double buffer | 2,0687 s | 0 | ×1,043 |
 
-Conclure en ordres de grandeur, et sur la limite atteinte (calcul ou bande passante mémoire ?).
+Le temps global inclut le processus complet ; le nombre d'allocations par Step
+provient du micro-benchmark isolé. Les versions bitpack et parallel ne sont pas
+encore implémentées ni mesurées. Aucun compteur matériel ne permet à ce stade
+de conclure à une limite de bande passante mémoire ou de calcul.
 
 ---
 

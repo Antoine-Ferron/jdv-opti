@@ -3,8 +3,8 @@
 package engines
 
 import (
+	_ "gol/internal/flat"  // étape 1 : grille plate + double buffering
 	_ "gol/internal/naive" // baseline — ne plus modifier après les mesures de référence
-	// _ "gol/internal/flat"    // étape 1 : grille plate + double buffering
 	// _ "gol/internal/bitpack" // étape 2 : 64 cellules par uint64
 	// _ "gol/internal/parallel" // étape 3 : worker pool
 )
