@@ -126,6 +126,13 @@ type Options struct {
 	// Affichage console : démo et mise au point, à laisser nil pour les mesures.
 	Render      io.Writer
 	RenderDelay time.Duration
+
+	// Snapshot, s'il est non nil, est appelé tous les SnapshotEvery tours (et au
+	// tour 0). C'est un rappel plutôt qu'un format concret : la sérialisation
+	// vit dans internal/snapshot, qui importe déjà ce paquet.
+	// À laisser nil pour les mesures — le chemin chronométré ne doit rien payer.
+	Snapshot      func(e Engine, turn int) error
+	SnapshotEvery int
 }
 
 // Result résume une exécution.
@@ -142,10 +149,18 @@ func Run(e Engine, opt Options) Result {
 		res.Err = err
 		return res
 	}
+	if err := capture(e, opt, 0); err != nil {
+		res.Err = err
+		return res
+	}
 	for res.Turns < opt.Turns {
 		e.Step()
 		res.Turns++
 		if err := dessine(e, opt); err != nil {
+			res.Err = err
+			return res
+		}
+		if err := capture(e, opt, res.Turns); err != nil {
 			res.Err = err
 			return res
 		}
@@ -201,4 +216,14 @@ func Names() []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// capture appelle le rappel de snapshot si l'option est active. Comme dessine,
+// elle sort immédiatement quand rien n'est demandé : le chemin mesuré ne paie
+// qu'une comparaison à nil par tour.
+func capture(e Engine, opt Options, turn int) error {
+	if opt.Snapshot == nil || turn%max(opt.SnapshotEvery, 1) != 0 {
+		return nil
+	}
+	return opt.Snapshot(e, turn)
 }
