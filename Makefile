@@ -5,7 +5,7 @@ TURNS ?= 500
 FIRES ?= 64
 ADDR  ?= 127.0.0.1:8081
 BANC  ?= $(shell uname -s)-$(shell uname -m)
-COMMIT := $(shell git rev-parse --short HEAD)
+COMMIT := $(shell git log -1 --format=%h -- internal cmd go.mod Makefile scripts)
 PROF  := results/$(COMMIT)/$(BANC)/profiles
 
 .PHONY: help build test env bench quick demo web profile flame layout escape tools clean

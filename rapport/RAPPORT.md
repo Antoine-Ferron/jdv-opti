@@ -106,10 +106,18 @@ des ratios :
   les versions et pour les deux bancs** — elle est dimensionnée pour la plus petite des deux
   machines (8 Gio sur le banc A), ce qui exclut de promouvoir en charge officielle une carte au-delà
   de 4096².
-- Une campagne = `make bench BANC=<nom>`, qui écrit dans `results/<commit>/<banc>/`. Le même commit
-  mesuré sur les deux machines donne deux dossiers frères. Le pipeline **refuse de mesurer sur un
-  arbre de travail modifié** : un dossier de résultats doit toujours correspondre exactement au code
-  du commit qu'il nomme.
+- Une campagne = `make bench BANC=<nom>`, qui écrit dans `results/<commit>/<banc>/`. Le commit retenu
+  n'est pas `HEAD` mais **le dernier ayant touché le code ou le protocole** (`internal`, `cmd`,
+  `go.mod`, `Makefile`, `scripts`) : un commit qui n'ajoute que des résultats ou du rapport ne
+  déplace pas la référence, si bien que les deux machines rangent leurs mesures au même endroit sans
+  avoir à se synchroniser sur un hash. `env.md` porte les deux, `HEAD` et le code mesuré.
+- Le pipeline **refuse de mesurer sur un arbre de travail modifié** : un dossier de résultats doit
+  toujours correspondre exactement au code qu'il nomme.
+
+> Les deux campagnes de référence ci-dessous ont été produites avant cette règle et portent donc des
+> commits différents — `a47848f` pour le banc B, `3617efa` pour le banc A. Leur code mesuré est
+> **identique**, ce que vérifie `git diff a47848f 3617efa -- internal cmd go.mod Makefile scripts`,
+> qui ne renvoie rien. Elles sont donc comparables ; les campagnes suivantes partageront un dossier.
 - Isolation du bruit : navigateur/IDE fermés, charge système vérifiée avant chaque campagne (voir
   `env.md`), [pinning si utilisé]. **L'alimentation est relevée banc par banc au §1.1** : la
   campagne M1 a été faite *sur batterie*, ce qui reste une source de variabilité — Hyperfine y

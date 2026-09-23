@@ -36,8 +36,12 @@ if ! git diff --quiet HEAD 2>/dev/null && [ "${FORCE:-0}" != 1 ]; then
 	exit 1
 fi
 
-commit=$(git rev-parse --short HEAD 2>/dev/null || echo nogit)
-out="results/${commit}/${BANC}"
+# Le dossier porte le dernier commit ayant touché le code ou le protocole, et non
+# HEAD : un commit qui n'ajoute que des résultats ou du rapport ne déplace pas la
+# référence. Deux machines rangent ainsi leurs mesures au même endroit sans avoir
+# à se synchroniser sur un hash, même si l'une a commité entre-temps.
+commit=$(git log -1 --format=%h -- internal cmd go.mod Makefile scripts 2>/dev/null || echo nogit)
+out="results/${commit:-nogit}/${BANC}"
 if [ -d "$out" ]; then
 	echo ">> Campagne existante pour ce commit et ce banc : elle sera remplacée."
 fi

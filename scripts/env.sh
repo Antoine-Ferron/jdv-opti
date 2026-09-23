@@ -8,6 +8,7 @@ section() { printf '\n## %s\n' "$1"; }
 echo "# Banc d'essai — $(date -Iseconds)"
 if git rev-parse --git-dir >/dev/null 2>&1; then
 	echo "Commit : $(git rev-parse --short HEAD 2>/dev/null || echo 'aucun')$(git diff --quiet HEAD 2>/dev/null || echo ' (ATTENTION : modifications non commitées)')"
+	echo "Code mesuré : $(git log -1 --format=%h -- internal cmd go.mod Makefile scripts) (dernier commit touchant le code ou le protocole)"
 else
 	echo "Commit : hors dépôt git"
 fi
