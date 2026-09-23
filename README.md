@@ -16,12 +16,21 @@ avant d'être mesurée.
 
 ```bash
 make demo                 # un incendie animé en console
+make web                  # la même chose dans le navigateur, en couleurs
 make test                 # conformité de toutes les implémentations
 make quick                # une exécution de la baseline
 make profile IMPL=naive   # profils CPU + allocations -> results/profiles/
 make flame IMPL=naive     # flamegraph dans le navigateur (View > Flame Graph)
 make bench                # campagne complète -> results/<date>-<commit>/
 make help                 # toutes les cibles
+```
+
+Sous WSL2, `make web` écoute sur la boucle locale de la distribution, que le navigateur Windows
+ne voit pas toujours. Dans ce cas :
+
+```bash
+make web ADDR=0.0.0.0:8081      # puis ouvrir http://<ip-wsl>:8081
+hostname -I | awk '{print $1}'  # l'adresse à utiliser
 ```
 
 ## La commande `wildfire`
@@ -85,6 +94,7 @@ petites allocations ; le profil coûte alors du temps et cette exécution ne ser
 | `internal/firetest` | Conformité : un test par règle, plus une référence indépendante |
 | `internal/engines` | Liste des implémentations compilées (une ligne par version) |
 | `internal/bench` | Benchmarks communs, nommés `impl=…/scenario=…/size=…` pour benchstat |
+| `cmd/web` | Carte interactive dans le navigateur (démo, hors mesures) |
 | `scripts/` | `env.sh` (banc d'essai), `run_benchmarks.sh` (pipeline) |
 | `results/` | Mesures brutes versionnées (pièces à conviction) |
 | `rapport/` | Rapport d'audit et figures |
