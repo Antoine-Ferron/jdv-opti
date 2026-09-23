@@ -111,3 +111,30 @@ func BenchmarkRun(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkNew isole la construction du moteur, que BenchmarkRun inclut dans sa
+// mesure et qu'Hyperfine amortit sur dix fois plus de tours.
+//
+// Elle a été écrite pour trancher une hypothèse — que l'avance de flat sur
+// Run/front venait d'un coût fixe de construction — et l'a réfutée : construire
+// coûte 0,32 ms à naive et 0,37 ms à flat sur 1024², quand l'écart à expliquer
+// est de 273 ms. Le gain est donc bien par tour, et dépend de la densité de feu.
+//
+// Elle reste utile telle quelle : elle borne ce qu'un coût fixe peut expliquer,
+// et montre que le stockage contigu ne rend pas la construction plus rapide —
+// flat alloue même 5,2 Mo contre 2,1 Mo, en 4 allocations contre 1026.
+func BenchmarkNew(b *testing.B) {
+	for _, impl := range fire.Names() {
+		f, _ := fire.Get(impl)
+		for _, n := range sizes {
+			m := carte(n, 64)
+			b.Run(fmt.Sprintf("impl=%s/size=%d", impl, n), func(b *testing.B) {
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					_ = f(m)
+				}
+			})
+		}
+	}
+}
