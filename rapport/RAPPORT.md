@@ -37,8 +37,8 @@ comparer un gain de ×4,1 à un gain de ×3,8 apprend que l'optimisation est por
 
 #### Banc A — référence
 
-> Valeurs issues d'un relevé `make env` antérieur, **à confirmer** par la première campagne
-> officielle.
+Source du relevé M1 : [env.md](../results/a47848f/m1-air/env.md), campagne du 23 septembre 2026.
+Les valeurs de cache sont celles exposées par sysctl, sans description exhaustive de la topologie.
 
 | Élément                   | Valeur                                                        |
 |---------------------------|---------------------------------------------------------------|
@@ -50,9 +50,9 @@ comparer un gain de ×4,1 à un gain de ×3,8 apprend que l'optimisation est por
 | Ligne de cache            | **128 o**                                                     |
 | RAM                       | 8 Gio unifiée                                                 |
 | OS                        | macOS 15.5 (build 24F74)                                      |
-| Runtime                   | *à relever* : `go version`, `GOARCH=arm64`, `CGO_ENABLED`, `GOGC`, `GOMAXPROCS` |
+| Runtime                   | Go 1.27.1, darwin/arm64, CGO_ENABLED=1, GOGC=100 ; variable GOMAXPROCS non définie |
 | SIMD disponibles          | NEON 128 bits (pas d'AVX : architecture ARM)                  |
-| Alimentation              | *à préciser* : secteur ou batterie, et réglage d'économie d'énergie |
+| Alimentation              | Sur batterie, mode économie d’énergie désactivé (déclaré par Cherif) |
 
 **Quatre réserves à porter au crédit de la métrologie, pas à sa charge :**
 
@@ -147,8 +147,19 @@ de ce que fait le programme.
 
 #### Banc A — référence
 
-*À produire* : coller `results/<commit>/<banc-A>/hyperfine-stats.md` (moyenne, médiane, écart-type,
-variance, CV) et commenter le coefficient de variation.
+Campagne sur le commit `a47848f`, carte 1024², 64 foyers, 500 tours demandés,
+avec 3 échauffements puis 15 exécutions Hyperfine.
+Source : [statistiques](../results/a47848f/m1-air/hyperfine-stats.md).
+
+| Moyenne | Médiane | Écart-type | Variance | CV | Min | Max |
+|---|---|---|---|---|---|---|
+| 6,3767 s | 6,4332 s | 0,1068 s | 0,01140 s² | 1,7 % | 6,1536 s | 6,4617 s |
+
+La dispersion relative est inférieure à 2 %, mais Hyperfine signale des valeurs
+atypiques : ce seuil ne suffit pas à garantir l'absence de perturbations.
+Le temps inclut le démarrage du processus et la génération de carte.
+Les micro-benchmarks Run restent fixés à 50 tours dans cette version ; leurs
+temps ne sont pas directement comparables à cette mesure globale à 500 tours.
 
 #### Banc B — contrôle
 
@@ -168,51 +179,77 @@ banc seront cités, en regard de ceux du banc A.
 
 ## 2. Diagnostic matériel & profiling réel — /5
 
-> Les deux captures ci-dessous n'existent pas encore : `rapport/figures/` est vide. Les produire
-> avec `make profile IMPL=naive` puis `make flame IMPL=naive` (menu *View > Flame Graph*), sur le
-> banc du §1.1 — le barème exige des profils générés sur la machine des étudiants.
+Les profils ci-dessous proviennent du banc M1, commit `a47848f`, carte
+1024 × 1024, 64 foyers et 500 tours demandés (`make profile BANC=m1-air`).
+Les captures sont conservées sans encadrés ajoutés ; les légendes et le texte explicitent les fonctions importantes.
 
 ### 2.1 Profil CPU de la baseline
 
-![Flamegraph CPU baseline](figures/flame-cpu-naive.png)
+![Flamegraph CPU baseline sur M1](figures/flame-cpu-naive.png)
 
-Annoter la capture : encadrer `Fingerprint` → `fmt.Sprintf`, et `Step` → la boucle de propagation.
-Source : `results/<commit>/<banc>/profiles/naive-cpu-top.txt` et `naive-cpu-list.txt` (coût ligne par ligne, produits
-par `make profile IMPL=naive`).
+*Le calcul dans Step domine le CPU. Les calculs d'indices toriques
+Map.At → Mod et le comptage Burning sont également visibles.*
+
+Sources : [profil CPU](../results/a47848f/m1-air/profiles/naive-cpu-top.txt)
+et [détail par ligne](../results/a47848f/m1-air/profiles/naive-cpu-list.txt).
+
+| Fonction | Part directe (flat) | Part appels inclus (cum) |
+|---|---:|---:|
+| Step | 71,64 % | 90,48 % |
+| Map.At | 3,11 % | 11,80 % |
+| Mod | 7,87 % | 8,07 % |
+| Burning | 5,80 % | 6,42 % |
+
+Le profil couvre 5,75 s, avec 4,83 s d'échantillons CPU. Les pourcentages
+portent sur ces échantillons, pas sur le temps Hyperfine. Les coûts cumulés
+s'incluent : Map.At et Mod sont notamment compris dans Step et ne doivent pas
+être ajoutés à ses 90,48 %. Le profil CPU commence après la génération de carte.
+Fingerprint n'est pas appelé par fire.Run et n'apparaît donc pas dans ce profil.
+
 
 ### 2.2 Profil d'allocations
 
-![Flamegraph allocations baseline](figures/flame-alloc-naive.png)
+![Flamegraph allocations baseline sur M1](figures/flame-alloc-naive.png)
 
-Chiffres attendus : allocations par tour (`allocs/op` de `BenchmarkStep` et `BenchmarkFingerprint`),
-octets alloués, part du temps passée dans `runtime.mallocgc` et dans le GC (`GODEBUG=gctrace=1`).
+*Sur cette exécution, le tampon d'allumage créé par Step domine les allocations.
+La génération initiale de la carte contribue également au volume total.*
+
+Source : [profil alloc_space](../results/a47848f/m1-air/profiles/naive-mem-top.txt).
+Le volume cumulé estimé est de 595,28 MB dans les unités affichées par pprof :
+Step représente 82,15 % et Generate, appels inclus, 17,33 %.
+Il ne s'agit ni du pic de mémoire ni de la mémoire conservée en fin d'exécution.
+Contrairement au profil CPU, le profil cumulatif d'allocations inclut la génération
+initiale. Les estimations échantillonnées ne remplacent pas les mesures par opération.
+
+Les [micro-benchmarks](../results/a47848f/m1-air/benchstat.txt) mesurent
+1 allocation de 1 Mio par Step à 1024². Le benchmark isolé de Fingerprint
+mesure environ 451 200 allocations et 16,82 Mio par appel ; cette opération
+ne fait pas partie de l'exécution normale profilée ici.
+
+Une mesure spécifique des
+pauses et du temps GC reste à effectuer ; elle ne se déduit pas du volume alloué.
 
 ### 2.3 Identification formelle du hot path
 
-Pour chaque goulot, l'enchaînement **symptôme mesuré → cause mécanique → preuve** :
+1. **Step : 90,48 % du CPU, appels inclus.** La propagation puis les transitions
+   balayent la grille. Map.At et Mod contribuent au calcul des positions toriques.
+   Source : profil CPU ci-dessus et `internal/naive/naive.go`.
+2. **Tampon d'allumage : 1 Mio alloué par tour en 1024².** Step construit un
+   nouveau tableau booléen à chaque appel. Le réutiliser est une hypothèse
+   mesurable de réduction des allocations, pas encore une preuve de gain CPU.
+3. **Burning : 6,42 % du CPU, appels inclus.** Le nombre de cases en feu est
+   recalculé par un balayage complet à chaque appel.
+4. **Fingerprint : coût isolé, hors du chemin de fire.Run.** Sur le banc M1,
+   sa médiane est de 24,19 ms contre 9,820 ms pour Step dans le scénario
+   embrasement, soit environ 2,46 fois. Ces benchmarks utilisent des états et
+   protocoles différents (empreinte sur état fixe, Step sur état évolutif) :
+   ce ratio n'est pas une part du temps de simulation. Le formatage des coordonnées
+   explique ses nombreuses allocations, mais son optimisation seule n'accélérera
+   pas fire.Run tant que celui-ci ne l'appelle pas.
 
-1. **`Fingerprint` coûte 1,7 fois un tour de simulation entier `[F6]`** — un `fmt.Sprintf` par case
-   active, puis une conversion `string → []byte` et un SHA-256 : réflexion, allocation d'une chaîne
-   à chaque appel. Mesuré à 1024², 64 foyers :
-
-   | | `Step` (un tour) | `Fingerprint` (un appel) |
-   |---|---|---|
-   | Temps | 12,19 ms | **20,62 ms** |
-   | Allocations | **1** | **451 200** |
-   | Octets alloués | 1,000 Mio | 16,83 Mio |
-
-   Le compte d'allocations et le volume alloué sont des propriétés du code, identiques sur les deux
-   bancs ; seuls les temps sont à reconfirmer sur le banc A. Le rapport de 1,7 est le premier
-   résultat exploitable de l'audit : **l'empreinte coûte plus cher que le calcul qu'elle
-   accompagne**, alors qu'elle n'est qu'un moyen de détecter un état déjà vu.
-2. **La propagation, xx % du CPU `[F5]` `[F1]`** — 8 modulos par case en feu (division entière), un
-   de plus pour le saut du vent (REGLES.md §5), et une double indirection `[][]Cell` : chaque ligne
-   est un bloc distinct du tas, les lignes *y-1*, *y* et *y+1* ne sont pas contiguës.
-3. **Le balayage intégral `[F4]`** — `Step` parcourt toute la carte pour appliquer les transitions,
-   alors que **seules les cases en feu propagent** (REGLES.md §4). C'est le gisement propre à ce
-   modèle, celui qu'un automate à grille dense n'offre pas.
-4. **Un tampon d'ignition alloué par tour `[F3]`**, plus `Burning()` qui recompte toute la carte à
-   chaque appel.
+Sources des micro-mesures : [benchstat](../results/a47848f/m1-air/benchstat.txt)
+et [résultats bruts](../results/a47848f/m1-air/bench.txt). Les comptes d'allocations
+sont ceux mesurés sur M1 ; leur égalité sur un autre environnement doit être vérifiée.
 
 ### 2.4 Deux pièges de lecture, à écarter avant d'interpréter
 
