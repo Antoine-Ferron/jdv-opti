@@ -12,10 +12,10 @@
 - INTERDIT : `fmt.Sprintf`, `fmt.Fprintf`, `strconv` et toute construction de chaîne.
 - INTERDIT : conversion `string` ↔ `[]byte` non indispensable.
 - INTERDIT : allocation sur le tas (`make`, `new`, `append` au-delà de la capacité, closures capturantes, interfaces boxées) sans justification écrite, vérifiée par `go build -gcflags=-m`.
-- INTERDIT : goroutine non bornée ; une goroutine par cellule ou par ligne. Workers ≤ cœurs physiques.
+- INTERDIT : goroutine non bornée ; une goroutine par case ou par ligne. Workers ≤ cœurs physiques.
 - INTERDIT : `%` et `/` dans la boucle interne quand un masque, un décalage ou une ligne fantôme suffit.
 - INTERDIT : `[][]T` pour la grille ; mémoire contiguë uniquement.
-- INTERDIT : `sync.Mutex` par cellule ou par petite zone ; écrits concurrents sur une même ligne de cache (*false sharing*).
+- INTERDIT : `sync.Mutex` par case ou par petite zone ; écrits concurrents sur une même ligne de cache (*false sharing*).
 - INTERDIT : `map` dans la boucle interne.
 
 ## 3. Justification empirique obligatoire
@@ -41,5 +41,5 @@ Vérification : go test ./internal/bench -run '^$' -bench 'Step/.*size=1024' -be
 ## 4. Format des réponses
 
 - Code et commandes d'abord ; prose ≤ 3 lignes.
-- Chiffres avec unités (ns/op, o/op, allocs/op, cellules/s).
+- Chiffres avec unités (ns/op, o/op, allocs/op, cases/s).
 - Pas de généralités ni de répétition de ces règles.
