@@ -8,7 +8,7 @@ BANC  ?= $(shell uname -s)-$(shell uname -m)
 COMMIT := $(shell git log -1 --format=%h -- internal cmd go.mod Makefile scripts)
 PROF  := results/$(COMMIT)/$(BANC)/profiles
 
-.PHONY: help build test env bench quick demo web profile flame layout escape tools clean
+.PHONY: help build test env bench quick demo web profile flame layout escape proto tools clean
 
 help: ## Affiche cette aide
 	@grep -E '^[a-z]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-9s %s\n", $$1, $$2}'
@@ -56,3 +56,7 @@ clean: ## Supprime binaires et snapshots (les résultats sont conservés)
 
 web: ## Lance la carte interactive (ADDR=0.0.0.0:8081 pour y accéder depuis Windows)
 	go run ./cmd/web -addr $(ADDR)
+
+proto: ## Régénère le code Protobuf (protoc + protoc-gen-go requis)
+	protoc --proto_path=internal/snapshot --go_out=. --go_opt=module=gol-wildfire \
+		internal/snapshot/snapshot.proto
