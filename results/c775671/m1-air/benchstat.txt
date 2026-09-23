@@ -1,0 +1,52 @@
+goos: darwin
+goarch: arm64
+pkg: gol-wildfire/internal/bench
+cpu: Apple M1
+                                      │    naive    │
+                                      │   sec/op    │
+Step/scenario=front/size=256-8          759.5µ ± 5%
+Step/scenario=front/size=1024-8         5.042m ± 2%
+Step/scenario=front/size=2048-8         10.29m ± 0%
+Step/scenario=embrasement/size=256-8    761.0µ ± 1%
+Step/scenario=embrasement/size=1024-8   9.928m ± 5%
+Step/scenario=embrasement/size=2048-8   24.38m ± 3%
+Fingerprint/size=1024-8                 24.30m ± 0%
+Run/scenario=front/size=512-8           40.47m ± 0%
+Run/scenario=embrasement/size=512-8     64.44m ± 1%
+geomean                                 9.174m
+
+                                      │    naive     │
+                                      │     B/s      │
+Step/scenario=front/size=256-8          82.30Mi ± 4%
+Step/scenario=front/size=1024-8         198.3Mi ± 2%
+Step/scenario=front/size=2048-8         388.6Mi ± 0%
+Step/scenario=embrasement/size=256-8    82.13Mi ± 1%
+Step/scenario=embrasement/size=1024-8   100.7Mi ± 5%
+Step/scenario=embrasement/size=2048-8   164.1Mi ± 4%
+geomean                                 143.2Mi
+
+                                      │    naive     │
+                                      │     B/op     │
+Step/scenario=front/size=256-8          64.00Ki ± 0%
+Step/scenario=front/size=1024-8         1.000Mi ± 0%
+Step/scenario=front/size=2048-8         4.000Mi ± 0%
+Step/scenario=embrasement/size=256-8    64.00Ki ± 0%
+Step/scenario=embrasement/size=1024-8   1.000Mi ± 0%
+Step/scenario=embrasement/size=2048-8   4.000Mi ± 0%
+Fingerprint/size=1024-8                 16.82Mi ± 0%
+Run/scenario=front/size=512-8           13.01Mi ± 0%
+Run/scenario=embrasement/size=512-8     13.01Mi ± 0%
+geomean                                 1.779Mi
+
+                                      │    naive    │
+                                      │  allocs/op  │
+Step/scenario=front/size=256-8           1.000 ± 0%
+Step/scenario=front/size=1024-8          1.000 ± 0%
+Step/scenario=front/size=2048-8          1.000 ± 0%
+Step/scenario=embrasement/size=256-8     1.000 ± 0%
+Step/scenario=embrasement/size=1024-8    1.000 ± 0%
+Step/scenario=embrasement/size=2048-8    1.000 ± 0%
+Fingerprint/size=1024-8                 451.2k ± 0%
+Run/scenario=front/size=512-8            564.0 ± 0%
+Run/scenario=embrasement/size=512-8      564.0 ± 0%
+geomean                                  17.36
