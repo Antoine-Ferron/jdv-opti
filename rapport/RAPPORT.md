@@ -168,9 +168,10 @@ banc seront cités, en regard de ceux du banc A.
 
 ## 2. Diagnostic matériel & profiling réel — /5
 
-> Les deux captures ci-dessous n'existent pas encore : `rapport/figures/` est vide. Les produire
-> avec `make profile IMPL=naive` puis `make flame IMPL=naive` (menu *View > Flame Graph*), sur le
-> banc du §1.1 — le barème exige des profils générés sur la machine des étudiants.
+> Les deux captures ci-dessous viennent du **banc B** (`results/a47848f/x86-controle/profiles/`),
+> produites avec `make profile` puis `make flame` (menu *View > Flame Graph*). **À refaire sur le
+> banc A**, qui fait foi, et **à annoter** avant rendu : le barème demande des captures annotées,
+> pas brutes.
 
 ### 2.1 Profil CPU de la baseline
 
