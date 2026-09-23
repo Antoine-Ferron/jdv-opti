@@ -445,6 +445,55 @@ Chaque étape est un **package distinct**, enregistré dans le registre de `inte
 `internal/engines` : la suite de conformité `internal/firetest` la rejoue automatiquement, et une
 version qui casse une règle est rejetée avant d'être mesurée.
 
+### Étape 1 — `flat` : stockage contigu et tampons réutilisés
+
+**Nature : mixte, selon les définitions du cours.** Macro : remplacement de
+`[][]Cell` par deux grilles contiguës `[]Cell`, modification de la structure des
+données. Micro : suppression du tampon d'allumage temporaire, désormais alloué
+une fois et réinitialisé avec `clear` à chaque tour.
+
+**Hypothèse :** passer de 1 allocation de 1 Mio par Step à 0 allocation et
+0 octet par tour sur 1024². Le gain de temps reste à mesurer ; moins
+d'allocations ne garantit pas un gain proportionnel de CPU.
+
+**Implémentation :** la propagation lit la grille courante et marque un tampon
+`[]bool`. Les transitions écrivent toutes les cellules dans la seconde grille,
+puis les deux grilles sont échangées. Réécrire chaque cellule et remettre les
+marques à zéro évite les états périmés. Le double tampon suit le plan convenu,
+mais n'est pas indispensable à la synchronisation de cette baseline déjà en
+deux phases ; son coût en mémoire et en écritures doit donc être évalué.
+
+**Complexité :** O(N) par Step et O(N) en mémoire avant et après, N étant le
+nombre de cases et le nombre de voisins étant borné. Burning reste un balayage
+O(N). Avec Cell de 2 octets, les deux grilles et le tampon représentent 5N octets
+de données persistantes (5 Mio en 1024²), hors carte et en-têtes. Ce changement
+réduit le volume alloué par tour, pas nécessairement la mémoire résidente.
+
+**Périmètre contrôlé :** règles, modulos, lecture du vent, recomptage Burning
+et formatage/SHA-256 de Fingerprint sont conservés. Le maintien du formatage et
+des modulos est une exception expérimentale aux interdits de constitution.md
+pour isoler cette étape. New et Fingerprint allouent toujours.
+La baseline naive et la référence firetest restent intactes.
+
+**Validation réalisée :** `go test ./... -count=1` passe. La suite commune est
+complétée par une comparaison cellule par cellule et des empreintes sur 100 tours
+avec vent et dimensions impaires, un test d'extinction sans contagion résiduelle,
+et un test `AllocsPerRun` qui vérifie zéro allocation par Step sur 67 × 45.
+L'analyse `go build -gcflags=-m ./internal/flat` documente les allocations du
+constructeur et de l'empreinte ; Step ne contient pas d'allocation de tampon.
+
+**Vérification de performance à exécuter après commit sur secteur :**
+
+```bash
+make bench BANC=m1-air
+make profile IMPL=flat BANC=m1-air
+```
+
+**Résultats banc A / banc B / portabilité :** à mesurer sur le même commit de
+code. Aucun gain de temps ni gain GC n'est revendiqué à ce stade. Comparer
+naive et flat dans la même campagne et préciser que BenchmarkRun et Hyperfine
+peuvent avoir des nombres de tours différents suivant le protocole versionné.
+
 ### 3.1 Mémoire & localité de cache
 
 - Grille plate `[]uint8` + double tampon, et tampon d'ignition réutilisé : zéro allocation par tour.
