@@ -1,0 +1,46 @@
+goos: darwin
+goarch: arm64
+pkg: gol-wildfire/internal/bench
+cpu: Apple M1
+                                      │    naive    │
+                                      │   sec/op    │
+Step/scenario=embrasement/size=256-8    752.2µ ± 1%
+Step/scenario=embrasement/size=1024-8   10.03m ± 4%
+Step/scenario=embrasement/size=2048-8   23.61m ± 1%
+Fingerprint/size=1024-8                 24.05m ± 0%
+Run/scenario=front/size=512-8           40.52m ± 0%
+Run/scenario=front/size=1024-8          159.0m ± 1%
+Run/scenario=embrasement/size=512-8     64.55m ± 1%
+Run/scenario=embrasement/size=1024-8    201.4m ± 1%
+geomean                                 27.82m
+
+                                      │    naive     │
+                                      │     B/s      │
+Step/scenario=embrasement/size=256-8    83.09Mi ± 1%
+Step/scenario=embrasement/size=1024-8   99.75Mi ± 4%
+Step/scenario=embrasement/size=2048-8   169.4Mi ± 1%
+geomean                                 112.0Mi
+
+                                      │    naive     │
+                                      │     B/op     │
+Step/scenario=embrasement/size=256-8    64.00Ki ± 0%
+Step/scenario=embrasement/size=1024-8   1.000Mi ± 0%
+Step/scenario=embrasement/size=2048-8   4.000Mi ± 0%
+Fingerprint/size=1024-8                 16.82Mi ± 0%
+Run/scenario=front/size=512-8           13.01Mi ± 0%
+Run/scenario=front/size=1024-8          52.03Mi ± 0%
+Run/scenario=embrasement/size=512-8     13.01Mi ± 0%
+Run/scenario=embrasement/size=1024-8    52.03Mi ± 0%
+geomean                                 6.104Mi
+
+                                      │    naive    │
+                                      │  allocs/op  │
+Step/scenario=embrasement/size=256-8     1.000 ± 0%
+Step/scenario=embrasement/size=1024-8    1.000 ± 0%
+Step/scenario=embrasement/size=2048-8    1.000 ± 0%
+Fingerprint/size=1024-8                 451.2k ± 0%
+Run/scenario=front/size=512-8            564.0 ± 0%
+Run/scenario=front/size=1024-8          1.076k ± 0%
+Run/scenario=embrasement/size=512-8      564.0 ± 0%
+Run/scenario=embrasement/size=1024-8    1.076k ± 0%
+geomean                                  142.1
