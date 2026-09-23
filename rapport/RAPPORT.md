@@ -26,10 +26,10 @@ Source : `results/<commit>/<banc>/env.md`, généré par `make env` au début de
 machines, pour répondre à une question que le barème ne pose pas mais qu'un ingénieur se pose :
 *le gain tient-il quand l'architecture change ?*
 
-| Banc | Rôle | Ce qu'on en tire |
-|---|---|---|
-| **A — MacBook Air M1** (ARM) | **référence** | Tous les chiffres cités dans ce rapport, sauf mention contraire explicite. |
-| **B — Intel Core Ultra 9 / WSL2** (x86) | contrôle | Uniquement le *ratio* de gain de chaque étape, comparé à celui du banc A. |
+| Banc                                    | Rôle          | Ce qu'on en tire                                                           |
+|-----------------------------------------|---------------|----------------------------------------------------------------------------|
+| **A — MacBook Air M1** (ARM)            | **référence** | Tous les chiffres cités dans ce rapport, sauf mention contraire explicite. |
+| **B — Intel Core Ultra 9 / WSL2** (x86) | contrôle      | Uniquement le *ratio* de gain de chaque étape, comparé à celui du banc A.  |
 
 Règle appliquée sans exception : **aucun tableau ne mélange les deux bancs**, et aucune valeur
 absolue du banc B n'est citée comme résultat. Comparer 2,1 s sur M1 à 0,8 s sur x86 n'apprend rien ;
@@ -40,19 +40,19 @@ comparer un gain de ×4,1 à un gain de ×3,8 apprend que l'optimisation est por
 Source du relevé M1 : [env.md](../results/dcc3622/m1-air/env.md), campagne du 23 septembre 2026.
 Les valeurs de cache sont celles exposées par sysctl, sans description exhaustive de la topologie.
 
-| Élément                   | Valeur                                                        |
-|---------------------------|---------------------------------------------------------------|
-| CPU (modèle)              | Apple M1                                                      |
-| Cœurs physiques / threads | 8 / 8 — **4 performance + 4 efficiency**, pas de SMT           |
-| L1i / L1d (par cœur)      | 128 Kio / 64 Kio                                              |
-| L2                        | 4 Mio                                                         |
-| L3                        | pas de L3 classique — *à préciser (System Level Cache)*       |
-| Ligne de cache            | **128 o**                                                     |
-| RAM                       | 8 Gio unifiée                                                 |
-| OS                        | macOS 15.5 (build 24F74)                                      |
+| Élément                   | Valeur                                                                             |
+|---------------------------|------------------------------------------------------------------------------------|
+| CPU (modèle)              | Apple M1                                                                           |
+| Cœurs physiques / threads | 8 / 8 — **4 performance + 4 efficiency**, pas de SMT                               |
+| L1i / L1d (par cœur)      | 128 Kio / 64 Kio                                                                   |
+| L2                        | 4 Mio                                                                              |
+| L3                        | pas de L3 classique — *à préciser (System Level Cache)*                            |
+| Ligne de cache            | **128 o**                                                                          |
+| RAM                       | 8 Gio unifiée                                                                      |
+| OS                        | macOS 15.5 (build 24F74)                                                           |
 | Runtime                   | Go 1.27.1, darwin/arm64, CGO_ENABLED=1, GOGC=100 ; variable GOMAXPROCS non définie |
-| SIMD disponibles          | NEON 128 bits (pas d'AVX : architecture ARM)                  |
-| Alimentation              | **Sur secteur**, mode économie d’énergie désactivé (déclaré par Cherif) |
+| SIMD disponibles          | NEON 128 bits (pas d'AVX : architecture ARM)                                       |
+| Alimentation              | **Sur secteur**, mode économie d’énergie désactivé (déclaré par Cherif)            |
 
 **Quatre réserves à porter au crédit de la métrologie, pas à sa charge :**
 
@@ -151,10 +151,10 @@ courte, la génération domine le temps total et **écrase le gain à mesurer**.
 
 Mesuré sur le banc B, carte 1024², 64 foyers :
 
-| Charge | Temps total | Dont simulation | Part de la génération |
-|---|---|---|---|
-| 50 tours | 0,84 s | 0,178 s | **79 %** |
-| **500 tours** | 8,15 s | 7,49 s | **8 %** |
+| Charge        | Temps total | Dont simulation | Part de la génération |
+|---------------|-------------|-----------------|-----------------------|
+| 50 tours      | 0,84 s      | 0,178 s         | **79 %**              |
+| **500 tours** | 8,15 s      | 7,49 s          | **8 %**               |
 
 À 50 tours, une optimisation qui diviserait `Step` par deux n'aurait apparu que comme ~10 % sur la
 ligne Hyperfine. **La charge est donc fixée à 500 tours**, ce qui ramène la génération sous 10 % du
@@ -173,9 +173,9 @@ Campagne sur le commit `dcc3622`, **machine sur secteur**, carte 1024², 64 foye
 demandés, avec 3 échauffements puis 15 exécutions Hyperfine.
 Source : [statistiques](../results/dcc3622/m1-air/hyperfine-stats.md).
 
-| Moyenne | Médiane | Écart-type | Variance | CV | Min | Max |
-|---|---|---|---|---|---|---|
-| 6,4229 s | 6,4606 s | 0,1968 s | 0,03872 s² | **3,1 %** | 6,1872 s | 6,9199 s |
+| Moyenne  | Médiane  | Écart-type | Variance   | CV        | Min      | Max      |
+|----------|----------|------------|------------|-----------|----------|----------|
+| 6,4229 s | 6,4606 s | 0,1968 s   | 0,03872 s² | **3,1 %** | 6,1872 s | 6,9199 s |
 
 La dispersion dépasse le seuil de 2 %, et le passage sur secteur l'a **aggravée** : une première
 campagne sur batterie, [conservée pour comparaison](../results/a47848f/m1-air/hyperfine-stats.md),
@@ -192,9 +192,9 @@ restent fixés à 50 tours ; leurs temps ne sont pas directement comparables à 
 Campagne de référence, commit `dcc3622`, carte 1024², 64 foyers, 500 tours, Hyperfine `-N --warmup 3
 --runs 15` (`results/dcc3622/x86-controle/`) :
 
-| Moyenne | Médiane | Écart-type | Variance | CV | Min | Max |
-|---|---|---|---|---|---|---|
-| 8,4021 s | 8,4104 s | 0,0611 s | 3,729 × 10⁻³ s² | **0,7 %** | 8,2926 s | 8,4825 s |
+| Moyenne  | Médiane  | Écart-type | Variance        | CV        | Min      | Max      |
+|----------|----------|------------|-----------------|-----------|----------|----------|
+| 8,4021 s | 8,4104 s | 0,0611 s   | 3,729 × 10⁻³ s² | **0,7 %** | 8,2926 s | 8,4825 s |
 
 Coefficient de variation à 0,7 %, bien sous le seuil de 2 % : la mesure est stable malgré une
 fréquence non verrouillée et la virtualisation WSL2 — c'est le warmup et le nombre de runs qui
@@ -283,13 +283,12 @@ Fingerprint est absent des deux profils car fire.Run ne l'appelle pas.
 ### 2.2 Profil d'allocations
 
 ![Flamegraph allocations baseline sur M1](figures/m1-air/flame-alloc-naive.png)
-
 *Figure 3 — **Banc A** (Apple M1, macOS). Même exécution que la figure 1, commit `dcc3622`. Profil :
 `results/dcc3622/m1-air/profiles/naive-mem.prof`, échantillonné à `MemProfileRate = 4096` octets.
 Sur cette exécution, le tampon d'allumage créé par Step domine les allocations ; la génération
-initiale de la carte contribue également au volume total.*
-
+initiale de la carte contribue également au volume total.*  
 Source : [profil alloc_space](../results/dcc3622/m1-air/profiles/naive-mem-top.txt).
+
 Le volume cumulé estimé est de 595,28 MB dans les unités affichées par pprof :
 Step représente 82,15 % et Generate, appels inclus, 17,33 %.
 Il ne s'agit ni du pic de mémoire ni de la mémoire conservée en fin d'exécution.
@@ -306,17 +305,35 @@ pauses et du temps GC reste à effectuer ; elle ne se déduit pas du volume allo
 
 #### Observation complémentaire — allocations du banc B
 
-Capture équivalente : `rapport/figures/x86-controle/flame-alloc-naive.png`. Elle n'est pas reproduite
-ici : les proportions y sont les mêmes qu'à la figure 3, ce qui est attendu puisque les allocations
-sont une propriété du code et non de la machine.
-
+![Flamegraph allocations baseline sur x86](figures/x86-controle/flame-alloc-naive.png)
+*Figure 4 — **Banc B** (Intel Core Ultra 9 275HX, WSL2). Même code, même charge, même commit que la
+figure 3. Profil : `results/dcc3622/x86-controle/profiles/naive-mem.prof`. La figure est
+superposable à la figure 3 : c'est le résultat à retenir, et il se vérifie ici plutôt que de
+s'affirmer.*  
 Source : [profil alloc_space x86](../results/dcc3622/x86-controle/profiles/naive-mem-top.txt).
-Sur 596,32 MB estimés par pprof, Step représente 490 MB (82,17 %) et Generate,
-appels inclus, 103,14 MB (17,30 %). Ces estimations cumulées confirment la même
-origine dominante des allocations que sur M1 ; elles ne sont pas un comptage
-exact des 500 tampons. Le micro-benchmark confirme séparément 1 Mio par Step.
-Generate est hors chronométrage des micro-benchmarks de simulation mais fait
-partie du processus mesuré par Hyperfine.
+
+Mise en regard des deux bancs :
+
+|                           |         Banc A (M1) |        Banc B (x86) |
+|---------------------------|--------------------:|--------------------:|
+| Total estimé              |           595,34 MB |           596,38 MB |
+| `Step`                    |    489 MB — 82,14 % |    491 MB — 82,33 % |
+| `Generate`, appels inclus | 103,14 MB — 17,32 % | 102,22 MB — 17,14 % |
+| `champLisse`              |      32 MB — 5,38 % |      32 MB — 5,37 % |
+| `quantile`                |   31,05 MB — 5,21 % |   31,05 MB — 5,21 % |
+
+**Les deux profils coïncident à 0,2 point près**, écart imputable à l'échantillonnage de pprof. C'est
+la vérification du principe utilisé ailleurs dans ce rapport : **le volume alloué est une propriété
+du code, pas de la machine**, et un compte d'allocations mesuré sur un banc vaut pour l'autre.
+
+Le contraste avec le §2.1 en est d'autant plus instructif : *le même volume alloué* se paie
+différemment selon le système — `runtime.madvise` à 5,43 % du CPU sur macOS, `gcBgMarkWorker` à
+2,35 % sur Linux. Volume identique, coût CPU différent : ces deux profils ne mesurent pas la même
+chose, et seul celui du CPU dit ce que les allocations coûtent réellement.
+
+Ces estimations cumulées ne sont pas un comptage exact des 500 tampons ; le micro-benchmark confirme
+séparément 1 Mio par `Step`. `Generate` est hors chronométrage des micro-benchmarks de simulation,
+mais fait partie du processus mesuré par Hyperfine.
 
 ### 2.3 Identification formelle du hot path
 
@@ -346,16 +363,14 @@ Les deux captures suivantes sont les mêmes vues que les figures 1 et 2, avec `M
 champ *Search regexp* de pprof : l'outil encadre lui-même les cadres correspondants, sans retouche
 d'image, et le champ reste visible dans la capture — n'importe qui peut la reproduire.
 
-![Filtre Mod sur le profil M1](figures/m1-air/flame-cpu-mod-naive.png)
-
-*Figure 4 — **Banc A** (M1). Le cadre `fire.Mod` encadré occupe environ 5 % de la largeur du
+![Filtre Mod sur le profil M1](figures/m1-air/flame-cpu-mod-naive.png)  
+*Figure 5 — **Banc A** (M1). Le cadre `fire.Mod` encadré occupe environ 5 % de la largeur du
 graphe ; `Burning`, à sa droite, est visiblement plus large — il coûte effectivement plus cher
 (6,74 % contre 5,24 %).*
 
 ![Filtre Mod sur le profil x86](figures/x86-controle/flame-cpu-mod-naive.png)
-
-*Figure 5 — **Banc B** (x86). Même filtre, même code, même charge, même commit : le cadre `fire.Mod`
-occupe environ 35 % de la largeur, soit sept fois plus qu'à la figure 4 (41,1 % du CPU contre 5,2 %).*
+*Figure 6 — **Banc B** (x86). Même filtre, même code, même charge, même commit : le cadre `fire.Mod`
+occupe environ 35 % de la largeur, soit sept fois plus qu'à la figure 5 (41,1 % du CPU contre 5,2 %).*
 
 **C'est le résultat central du diagnostic**, et il n'aurait pas été visible avec un seul banc : la
 division entière du modulo torique domine le profil x86 et reste marginale sur ARM. Une optimisation
@@ -364,7 +379,6 @@ qui la supprime doit donc être attendue comme un gain majeur sur le banc B et m
 d'instructions n'étant pas établi par ces seuls profils.
 
 #### Pistes de portabilité issues du diagnostic x86
-
 Le [profil par ligne x86](../results/dcc3622/x86-controle/profiles/naive-cpu-list.txt)
 met en évidence le calcul des cibles via Map.At, la lecture du vent via WindAt
 et le calcul du secteur amont. WindAt est interrogé pour chaque case en feu,
