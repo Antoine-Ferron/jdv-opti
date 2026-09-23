@@ -28,6 +28,11 @@ func etatCapture(n int) *snapshot.State {
 // SetBytes reçoit la taille produite, si bien que la colonne B/s de benchstat
 // donne le débit d'écriture — et non un débit de cases, qui n'aurait pas de
 // sens quand les formats produisent des volumes aussi différents.
+//
+// La taille par case est publiée comme métrique (`o/case`) plutôt que relevée à
+// la main : c'est le chiffre central de l'axe I/O, il doit atterrir dans
+// results/ avec les autres et non dans un test jetable. Elle ne dépend pas de
+// la machine, mais la mesurer ici garantit qu'elle est reproductible.
 func BenchmarkSnapshotWrite(b *testing.B) {
 	for _, n := range []int{256, 1024} {
 		s := etatCapture(n)
@@ -46,8 +51,43 @@ func BenchmarkSnapshotWrite(b *testing.B) {
 						b.Fatal(err)
 					}
 				}
+				b.StopTimer()
+				b.ReportMetric(float64(taille.n)/float64(n*n), "o/case")
+				b.ReportMetric(float64(taille.n), "o/snapshot")
 			})
 		}
+	}
+}
+
+// BenchmarkSnapshotPacked mesure la variante sans décor : dans une série, seul
+// le premier snapshot a besoin du terrain et du vent, qui sont immuables.
+func BenchmarkSnapshotPacked(b *testing.B) {
+	n := 1024
+	s := etatCapture(n)
+	for _, cas := range []struct {
+		nom string
+		f   snapshot.Packed
+	}{
+		{"avec-decor", snapshot.Packed{}},
+		{"sans-decor", snapshot.Packed{SansDecor: true}},
+	} {
+		b.Run(fmt.Sprintf("variante=%s/size=%d", cas.nom, n), func(b *testing.B) {
+			taille := &compteur{}
+			if err := cas.f.Write(taille, s); err != nil {
+				b.Fatal(err)
+			}
+			b.SetBytes(taille.n)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if err := cas.f.Write(io.Discard, s); err != nil {
+					b.Fatal(err)
+				}
+			}
+			b.StopTimer()
+			b.ReportMetric(float64(taille.n)/float64(n*n), "o/case")
+			b.ReportMetric(float64(taille.n), "o/snapshot")
+		})
 	}
 }
 
