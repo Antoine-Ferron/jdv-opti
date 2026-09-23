@@ -48,7 +48,8 @@ make bench                  # campagne sur cette machine
 make bench BANC=m1-air      # nom de banc explicite
 ```
 
-Les résultats atterrissent dans `results/<commit>/<banc>/` : le même commit mesuré sur les deux
+Les résultats atterrissent dans `results/<commit>/<banc>/`, les profils dans son sous-dossier
+`profiles/`, et les captures de flamegraph dans `rapport/figures/<banc>/`. Le même commit mesuré sur les deux
 machines donne deux dossiers frères, directement comparables. Le pipeline **refuse de mesurer sur un
 arbre de travail modifié** (`FORCE=1` pour passer outre, à éviter) — un dossier de résultats doit
 toujours correspondre au code du commit qu'il nomme.

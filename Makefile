@@ -39,7 +39,7 @@ profile: build ## Profils CPU + allocations de IMPL -> results/<commit>/<banc>/p
 	go tool pprof -sample_index=alloc_space -top -nodecount=15 bin/wildfire $(PROF)/$(IMPL)-mem.prof | tee $(PROF)/$(IMPL)-mem-top.txt
 	go tool pprof -list 'Step|Fingerprint|Burning' bin/wildfire $(PROF)/$(IMPL)-cpu.prof > $(PROF)/$(IMPL)-cpu-list.txt
 
-flame: ## Ouvre pprof dans le navigateur (View > Flame Graph) pour capturer les figures
+flame: ## pprof dans le navigateur (View > Flame Graph) -> rapport/figures/<banc>/
 	go tool pprof -http=localhost:8080 bin/wildfire $(PROF)/$(IMPL)-cpu.prof
 
 layout: ## Taille des structs (axe padding)

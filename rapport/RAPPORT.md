@@ -168,14 +168,15 @@ banc seront cités, en regard de ceux du banc A.
 
 ## 2. Diagnostic matériel & profiling réel — /5
 
-> Les deux captures ci-dessous viennent du **banc B** (`results/a47848f/x86-controle/profiles/`),
+> Les captures sont rangées par banc : **`rapport/figures/<banc>/<vue>-<implémentation>.png`**.
+> Celles ci-dessous viennent du **banc B** (profils : `results/a47848f/x86-controle/profiles/`),
 > produites avec `make profile` puis `make flame` (menu *View > Flame Graph*). **À refaire sur le
 > banc A**, qui fait foi, et **à annoter** avant rendu : le barème demande des captures annotées,
 > pas brutes.
 
 ### 2.1 Profil CPU de la baseline
 
-![Flamegraph CPU baseline](figures/flame-cpu-naive.png)
+![Flamegraph CPU baseline](figures/x86-controle/flame-cpu-naive.png)
 
 Annoter la capture : encadrer `Step` → `Map.At` → `fire.Mod`.
 
@@ -202,7 +203,7 @@ par `make profile IMPL=naive`).
 
 ### 2.2 Profil d'allocations
 
-![Flamegraph allocations baseline](figures/flame-alloc-naive.png)
+![Flamegraph allocations baseline](figures/x86-controle/flame-alloc-naive.png)
 
 Relevé du banc B, même exécution (596 Mo alloués au total) :
 
