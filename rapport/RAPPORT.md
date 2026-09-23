@@ -4,10 +4,15 @@
 >
 > Consigne de rédaction : chaque affirmation chiffrée renvoie à un fichier de `results/`.
 > Rédiger chaque section **juste après** la mesure correspondante, jamais à la fin.
+>
+> Les règles du modèle simulé sont spécifiées dans `internal/fire/REGLES.md` ; les renvois `§n`
+> ci-dessous pointent vers ses sections. Les défauts volontaires de la baseline sont numérotés
+> `[F1]`–`[F7]` en tête de `internal/naive/naive.go`.
 
 ## Résumé exécutif
 
-Trois phrases : point de départ (débit baseline en cellules/s), point d'arrivée, facteur de gain global et les deux leviers principaux.
+Trois phrases : point de départ (débit baseline en cases/s), point d'arrivée, facteur de gain global
+et les deux leviers principaux.
 
 ---
 
@@ -15,45 +20,65 @@ Trois phrases : point de départ (débit baseline en cellules/s), point d'arriv�
 
 ### 1.1 Banc d'essai matériel
 
-Source : `results/env-2026-09-22.md` (généré par `make env`, complété des relevés hôte Windows).
+Source : `results/<run>/env.md`, généré par `make env`.
 
-| Élément                   | Valeur                                                                                             |
-|---------------------------|----------------------------------------------------------------------------------------------------|
-| CPU (modèle)              | Intel Core Ultra 9 275HX (Arrow Lake-HX), base 2,7 GHz                                             |
-| Cœurs physiques / threads | 24 / 24 — **pas de SMT** : 1 thread par cœur                                                       |
-| L1d / L1i (par cœur)      | 48 Kio / 64 Kio                                                                                    |
-| L2                        | 3 Mio privés par cœur — **40 Mio au total** côté hôte                                              |
-| L3                        | 36 Mio partagés par les 24 cœurs                                                                   |
-| Ligne de cache            | 64 o                                                                                               |
-| RAM                       | 64 Gio DDR5-6400 (2×32 Gio SK Hynix) — **31 Gio visibles depuis WSL2**                             |
-| OS / noyau                | Windows 11 Famille 10.0.26200 → **WSL2** Ubuntu 26.04 LTS, noyau 6.6.114.1-microsoft-standard-WSL2 |
-| Runtime                   | go1.27.1 linux/amd64, `GOAMD64=v1`, `CGO_ENABLED=0`, `GOGC=100`, `GOMAXPROCS=24`                   |
-| SIMD disponibles          | sse4_2, avx, avx2 (pas d'AVX-512 sur Arrow Lake)                                                   |
-| Alimentation / gouverneur | secteur, profil Acer `ed2c8e98-…` ; gouverneur **non exposé** sous WSL2                            |
+> **Banc retenu : le MacBook Air M1.** Les valeurs ci-dessous viennent d'un relevé `make env`
+> antérieur et sont **à confirmer** par la première campagne officielle. Toute mesure produite sur
+> une autre machine est écartée du rapport : les ratios de gain ne sont comparables qu'à matériel
+> constant.
 
-**Trois réserves à porter au crédit de la métrologie, pas à sa charge :**
+| Élément                   | Valeur                                                        |
+|---------------------------|---------------------------------------------------------------|
+| CPU (modèle)              | Apple M1                                                      |
+| Cœurs physiques / threads | 8 / 8 — **4 performance + 4 efficiency**, pas de SMT           |
+| L1i / L1d (par cœur)      | 128 Kio / 64 Kio                                              |
+| L2                        | 4 Mio                                                         |
+| L3                        | pas de L3 classique — *à préciser (System Level Cache)*       |
+| Ligne de cache            | **128 o**                                                     |
+| RAM                       | 8 Gio unifiée                                                 |
+| OS                        | macOS 15.5 (build 24F74)                                      |
+| Runtime                   | *à relever* : `go version`, `GOARCH=arm64`, `CGO_ENABLED`, `GOGC`, `GOMAXPROCS` |
+| SIMD disponibles          | NEON 128 bits (pas d'AVX : architecture ARM)                  |
+| Alimentation              | *à préciser* : secteur ou batterie, et réglage d'économie d'énergie |
 
-1. **Virtualisation Hyper-V.** Les mesures tournent dans WSL2, pas sur le métal. Le
-   coût est constant entre toutes les versions comparées — les *rapports* de gain
-   restent valides, les valeurs absolues de débit sont minorées.
-2. **Topologie hybride masquée.** L'Arrow Lake-HX mêle P-cores et E-cores, mais WSL2
-   présente 24 cœurs homogènes (`lscpu` annonce même 72 Mio de L2, contre 40 Mio
-   relevés côté hôte). Conséquence directe pour le §3.2 : un worker pool dimensionné
-   à `GOMAXPROCS` répartit le travail sur des cœurs de puissances inégales, et la
-   génération la plus lente impose son rythme à la barrière de synchronisation.
-   Attendre une scalabilité sous-linéaire dès que le nombre de workers dépasse le
-   nombre de P-cores.
-3. **Fréquence non verrouillée.** Ni gouverneur ni état turbo ne sont pilotables
-   depuis WSL2 : c'est le warmup Hyperfine et le coefficient de variation qui
-   attestent de la stabilité, pas un réglage système.
+**Quatre réserves à porter au crédit de la métrologie, pas à sa charge :**
+
+1. **Cœurs hétérogènes.** Le M1 mêle 4 cœurs *performance* et 4 cœurs *efficiency*. Conséquence
+   directe pour le §3.2 : un worker pool dimensionné à `GOMAXPROCS` (8) répartit le travail sur des
+   cœurs de puissances très inégales, et la bande la plus lente impose son rythme à la barrière de
+   synchronisation. Attendre une scalabilité sous-linéaire dès que le nombre de workers dépasse 4,
+   et dimensionner le pool aux cœurs *performance*.
+2. **Ligne de cache de 128 octets**, le double du x86. Le *false sharing* du §4 se joue donc sur des
+   zones deux fois plus larges, et le découpage en bandes du worker pool doit aligner ses frontières
+   sur 128 o — une bande dont le bord partage une ligne avec la bande voisine invalide le cache des
+   deux cœurs à chaque écriture.
+3. **`perf` n'existe pas sur macOS.** Pas de compteur matériel `cache-misses` en ligne de commande.
+   Les preuves du §2 reposent donc sur pprof (CPU et allocations) et, si un compteur matériel
+   devient nécessaire, sur Instruments. À dire explicitement plutôt qu'à passer sous silence.
+4. **Fréquence non verrouillée.** Apple Silicon ne laisse ni piloter le gouverneur ni figer le
+   turbo. C'est le warmup Hyperfine et le coefficient de variation qui attestent de la stabilité,
+   pas un réglage système.
 
 ### 1.2 Protocole de mesure
 
 - Outil : Hyperfine `-N --warmup 3 --runs 15`, binaire exécuté sans shell intermédiaire.
 - Justification du warmup : cache disque du binaire, caches CPU, stabilisation de la fréquence.
-- Charge de travail : carte 1024×1024, graine 42, 64 foyers, 50 tours. **Identique pour toutes les versions.**
-- Isolation du bruit : navigateur/IDE fermés, machine sur secteur, charge système vérifiée avant chaque campagne (voir `env.md`), [pinning `taskset` si utilisé].
-- Micro-benchmarks : `go test -bench -benchmem -count 10`, comparés avec benchstat (intervalle de confiance, test de significativité).
+- Charge de travail : carte 1024×1024, graine 42, 64 foyers, `TURNS` tours. **Identique pour toutes
+  les versions.**
+- Isolation du bruit : navigateur/IDE fermés, machine sur secteur, charge système vérifiée avant
+  chaque campagne (voir `env.md`), [pinning si utilisé].
+- Micro-benchmarks : `go test -bench -benchmem -count 10`, comparés avec benchstat (intervalle de
+  confiance, test de significativité).
+
+**Deux périmètres de mesure, à ne pas confondre — et c'est un piège vérifié.** La carte est
+engendrée par `fire.Generate` **avant** la boucle de tours : les micro-benchmarks l'excluent de
+leur chronomètre, mais Hyperfine mesure le processus entier, génération comprise. Sur une charge
+trop courte, la génération domine le temps total et **écrase le gain à mesurer** : une optimisation
+qui diviserait `Step` par deux n'apparaîtrait que comme quelques pour cent sur la ligne Hyperfine.
+
+*À chiffrer sur le banc retenu, puis à fixer* : le nombre de tours de la charge Hyperfine est choisi
+pour que la simulation représente l'essentiel du temps mesuré. Donner ici les deux durées mesurées
+(génération seule, simulation seule) et le `TURNS` qui en découle.
 
 ### 1.3 Mesures de référence
 
@@ -64,26 +89,57 @@ Commenter le coefficient de variation : < 2 % = mesure stable.
 
 ## 2. Diagnostic matériel & profiling réel — /5
 
+> Les deux captures ci-dessous n'existent pas encore : `rapport/figures/` est vide. Les produire
+> avec `make profile IMPL=naive` puis `make flame IMPL=naive` (menu *View > Flame Graph*), sur le
+> banc du §1.1 — le barème exige des profils générés sur la machine des étudiants.
+
 ### 2.1 Profil CPU de la baseline
 
 ![Flamegraph CPU baseline](figures/flame-cpu-naive.png)
 
-Annoter la capture : encadrer `Fingerprint` → `fmt.Sprintf`, et `Step` → `neighbors`.
-Source : `results/profiles/naive-cpu-top.txt`, `naive-cpu-list.txt` (coût ligne par ligne).
+Annoter la capture : encadrer `Fingerprint` → `fmt.Sprintf`, et `Step` → la boucle de propagation.
+Source : `results/profiles/naive-cpu-top.txt`, `naive-cpu-list.txt` (coût ligne par ligne, produit
+par `make profile IMPL=naive`).
 
 ### 2.2 Profil d'allocations
 
 ![Flamegraph allocations baseline](figures/flame-alloc-naive.png)
 
-Chiffres attendus : allocations par génération (`allocs/op` de `BenchmarkStep` et `BenchmarkFingerprint`), octets alloués, part du temps passée dans `runtime.mallocgc` et dans le GC (`GODEBUG=gctrace=1`).
+Chiffres attendus : allocations par tour (`allocs/op` de `BenchmarkStep` et `BenchmarkFingerprint`),
+octets alloués, part du temps passée dans `runtime.mallocgc` et dans le GC (`GODEBUG=gctrace=1`).
 
 ### 2.3 Identification formelle du hot path
 
 Pour chaque goulot, l'enchaînement **symptôme mesuré → cause mécanique → preuve** :
 
-1. **`Fingerprint`, xx % du CPU** — un `fmt.Sprintf` par cellule vivante (~300 000 par génération en 1024²) : réflexion, conversion d'entiers, allocation d'une chaîne à chaque appel, puis copie `string → []byte` → pression GC.
-2. **`neighbors`, xx % du CPU** — 8 modulos (division entière : ~20-40 cycles chacune) et 8 branchements par cellule ; double indirection `[][]bool` : chaque ligne est un bloc distinct du tas, la ligne y-1, y et y+1 ne sont pas contiguës.
-3. **`Step`, une grille complète allouée par génération** — 1024 slices + 1 Mo par génération, collectés par le GC.
+1. **`Fingerprint`, xx % du CPU `[F6]`** — un `fmt.Sprintf` par case active, puis une conversion
+   `string → []byte` et un SHA-256 : réflexion, allocation d'une chaîne à chaque appel, des
+   centaines de milliers d'allocations par appel → pression GC. Sur le jeu de la vie, la même
+   construction coûtait *plus cher qu'un tour de simulation entier* ; vérifier si c'est aussi le cas
+   ici, le nombre de cases actives étant du même ordre.
+2. **La propagation, xx % du CPU `[F5]` `[F1]`** — 8 modulos par case en feu (division entière), un
+   de plus pour le saut du vent (REGLES.md §5), et une double indirection `[][]Cell` : chaque ligne
+   est un bloc distinct du tas, les lignes *y-1*, *y* et *y+1* ne sont pas contiguës.
+3. **Le balayage intégral `[F4]`** — `Step` parcourt toute la carte pour appliquer les transitions,
+   alors que **seules les cases en feu propagent** (REGLES.md §4). C'est le gisement propre à ce
+   modèle, celui qu'un automate à grille dense n'offre pas.
+4. **Un tampon d'ignition alloué par tour `[F3]`**, plus `Burning()` qui recompte toute la carte à
+   chaque appel.
+
+### 2.4 Deux pièges de lecture, à écarter avant d'interpréter
+
+Ces deux observations ont été faites au cours de la mise au point, sur une autre machine que le banc
+retenu : **elles sont méthodologiques, à reproduire ici avant d'être citées comme résultat.**
+
+1. **Le débit en cases/s augmente avec la taille de la carte**, à nombre de foyers constant. Ce
+   n'est pas une amélioration : plus la carte est grande, plus la fraction qui brûle est petite, et
+   le débit compte des cases *balayées*, pas du travail utile. Pour comparer deux tailles, il faut
+   garder la **densité de feu** constante — foyers proportionnels à la surface.
+2. **Brider la machine ne change pas les ratios.** Réduire le nombre de cœurs, rendre le GC agressif
+   ou contraindre la RAM laisse le temps d'exécution inchangé : la baseline est mono-thread et
+   n'alloue qu'une fois par tour. Seule la contention CPU la ralentit, et linéairement. Corollaire
+   utile : une machine plus lente ne fait pas apparaître un gain qui n'existe pas — c'est la
+   mesure normalisée (cycles par case) qui démasque une implémentation coûteuse, pas le chronomètre.
 
 ---
 
@@ -98,36 +154,77 @@ Une entrée par étape, toujours au même format :
 > - **Résultat :** avant → après (benchstat, avec p-value) ; allocs/op avant → après.
 > - **Explication physique :** …
 
+Chaque étape est un **package distinct**, enregistré dans le registre de `internal/fire` et ajouté à
+`internal/engines` : la suite de conformité `internal/firetest` la rejoue automatiquement, et une
+version qui casse une règle est rejetée avant d'être mesurée.
+
 ### 3.1 Mémoire & localité de cache
 
-- Grille plate `[]uint8` + double buffering (zéro allocation par génération).
-- Suppression des modulos : lignes fantômes ou traitement séparé des bords.
-- Bit-packing : 64 cellules par `uint64`, comptage des voisins par opérations bit à bit ; empreinte mémoire ÷ 8, une ligne de 1024 cellules = 128 o = 2 lignes de cache.
-- Struct padding : `unsafe.Sizeof(Sim{})` 72 o → 56 o (`make layout`).
-- Empreinte sans allocation : hachage FNV-1a direct sur les mots de la grille (`make escape` pour prouver l'absence d'échappement).
+- Grille plate `[]uint8` + double tampon, et tampon d'ignition réutilisé : zéro allocation par tour.
+- Compacité : `Cell` occupe 2 octets alors que l'état tient sur **4 bits** — `feu` ≤ 2 et `repos` ≤ 3
+  tiennent chacun sur 2 bits (REGLES.md §2). Empreinte ÷ 4, puis ÷ 32 en bit-packé.
+- Suppression des modulos : bordure fantôme ou traitement séparé des bords.
+- **Bit-packing, sous la forme propre à ce modèle.** La contagion est un **OU logique** entre toutes
+  les sources (REGLES.md §4) : il n'y a rien à *compter*. « Au moins un voisin en feu » s'écrit en
+  huit décalages et sept `OR` sur des mots de 64 cases, là où un automate à comptage exigerait des
+  demi-additionneurs SWAR. Les compteurs `feu` et `repos` se décrémentent en logique bit à bit sur
+  des plans de bits séparés. Le vent reste traité à part, en boucle sur les seules cases ventées —
+  ses cinq cibles et son saut dépendent d'une direction, donc ne se vectorisent pas.
+- Struct padding : `unsafe.Sizeof(Cell{})` et `Sizeof(Sim{})` avant/après (`make layout`).
+- Empreinte sans allocation : hachage FNV-1a direct sur les mots de la grille (`make escape` pour
+  prouver l'absence d'échappement).
+- **Liste des cases actives `[F4]`** : ne visiter que le front plutôt que toute la carte. À mesurer
+  sur les *deux* scénarios — voir §4, le résultat n'est pas le même.
 
 ### 3.2 Concurrence & scalabilité CPU
 
-- Worker pool : découpage en bandes horizontales, nombre de workers = cœurs **physiques** (justifier contre les threads SMT).
-- Synchronisation : `sync.WaitGroup` par génération ou barrière ; population comptée avec `atomic.Int64`.
-- Arrêt précoce : `context.WithCancel` / `WithTimeout`, annulation dès détection d'un cycle.
-- Courbe de scalabilité : temps en fonction du nombre de workers (1, 2, 4, …), comparée à la loi d'Amdahl.
+- Worker pool : découpage en bandes horizontales, nombre de workers = cœurs **performance** (4), et
+  non `GOMAXPROCS` (8) — justification au §1.1, réserve 1.
+- Aucune synchronisation nécessaire *à l'intérieur* d'un tour : la contagion étant associative et
+  commutative, deux bandes peuvent enflammer la même case sans verrou ni ordre imposé. Seule la
+  barrière de fin de tour est requise (`sync.WaitGroup`), la mise à jour restant synchrone
+  (REGLES.md §1).
+- Compteurs (`Burning`) agrégés par `atomic.Int64` ou par réduction locale à chaque worker.
+- Arrêt précoce : `context.WithCancel` / `WithTimeout`, annulation dès extinction (REGLES.md §6).
+- Courbe de scalabilité : temps en fonction du nombre de workers (1, 2, 4, 8), comparée à la loi
+  d'Amdahl, avec le décrochage attendu au-delà de 4.
 
 ### 3.3 I/O réseau & persistance
 
-- Snapshots : JSON `[][]bool` → Protobuf / format bit-packé (taille fichier et temps de sérialisation).
-- PostgreSQL : historique (génération, empreinte, population) ; requête de détection de cycle sans puis avec index (`EXPLAIN ANALYZE` avant/après).
-- Cache : LRU des empreintes déjà vues ; `sync.Pool` pour les buffers de sérialisation.
+*Cet axe n'a encore aucun support dans le code : les snapshots, la base et le cache sont à écrire.
+Plan de travail dans l'ordre ci-dessous, un commit par étape.*
+
+- **Sérialisation** : snapshot de l'état d'un tour, d'abord en JSON naïf (baseline de l'axe : un
+  tableau de structures par case), puis en **format binaire compact** — 4 bits par case, terrain et
+  vent envoyés une seule fois puisqu'ils sont immuables. Mesurer les deux : taille du fichier et
+  temps de sérialisation. Protobuf ou un encodage maison, à justifier.
+- **Base de données** : historique des tours (tour, empreinte, cases en feu, surface brûlée). Une
+  requête d'analyse — par exemple retrouver les tours dont l'empreinte se répète, ou la progression
+  de la surface brûlée — exécutée **sans puis avec index**, avec `EXPLAIN ANALYZE` avant/après et le
+  plan d'exécution commenté (`Seq Scan` → `Index Scan`).
+- **Cache** : `sync.Pool` sur les tampons de sérialisation (les snapshots sont périodiques et de
+  taille constante, c'est le cas d'usage idéal), et LRU des empreintes déjà vues.
 
 ---
 
 ## 4. Confrontation critique & échec constructif — /3
 
-> **Tentative :** … (ex. une goroutine par cellule, ou bandes trop fines → *false sharing*)
+> **Tentative :** …
 > - **Hypothèse initiale :** …
 > - **Mesure :** régression de x % (benchstat, commit `…`)
-> - **Explication mécanique chiffrée :** coût d'ordonnancement d'une goroutine (~µs) × 1 M cellules vs coût du calcul d'une cellule (~ns) ; ou invalidations de lignes de cache entre cœurs (compteurs `perf stat -e cache-misses` si disponible).
+> - **Explication mécanique chiffrée :** …
 > - **Retour arrière :** commit `…` (git revert)
+
+Trois pistes, par ordre d'intérêt :
+
+1. **La liste des cases actives qui ne rapporte rien.** C'est le meilleur candidat, parce qu'elle
+   n'échoue pas partout : elle écrase la baseline en scénario `front` (un foyer, presque rien ne
+   brûle) et ne rapporte quasi rien en scénario `embrasement` (carte saturée), où le coût de tenir
+   la liste à jour rejoint celui du balayage. Une optimisation dont le gain dépend du régime, chiffres
+   à l'appui, vaut mieux qu'un échec franc.
+2. **Une goroutine par case** : coût d'ordonnancement (~µs) contre coût de calcul d'une case (~ns).
+3. **Des bandes trop fines** → *false sharing*, aggravé ici par la ligne de cache de **128 o** : deux
+   workers qui écrivent à moins de 128 octets l'un de l'autre s'invalident mutuellement le cache.
 
 ---
 
@@ -136,7 +233,7 @@ Une entrée par étape, toujours au même format :
 ### 5.1 Reproduire toutes les mesures
 
 ```bash
-git clone … && cd gol
+git clone https://github.com/Antoine-Ferron/jdv-opti.git && cd jdv-opti
 make tools   # benchstat
 make bench   # env + tests + go bench + hyperfine + benchstat -> results/<date>-<commit>/
 ```
@@ -145,17 +242,40 @@ make bench   # env + tests + go bench + hyperfine + benchstat -> results/<date>-
 
 Coller `results/<run>/benchstat.txt` (benchstat `-col /impl`) et le tableau Hyperfine.
 
-| Version | Temps (1024², 50 gén.) | Débit (cellules/s) | allocs/génération | Gain cumulé |
+**Scénario `embrasement`** (64 foyers, carte saturée) :
+
+| Version | Temps (1024², N tours) | Débit (cases/s) | allocs/tour | Gain cumulé |
 |---|---|---|---|---|
 | naive (baseline) | | | | ×1 |
-| flat + double buffer | | | 0 | |
+| flat + double tampon | | | 0 | |
 | bitpack | | | 0 | |
 | parallel (N workers) | | | | |
 
-Conclure en ordres de grandeur, et sur la limite atteinte (calcul ou bande passante mémoire ?).
+**Scénario `front`** (1 foyer, carte creuse) :
+
+| Version | Temps (1024², N tours) | Débit (cases/s) | allocs/tour | Gain cumulé |
+|---|---|---|---|---|
+| naive (baseline) | | | | ×1 |
+| liste des cases actives | | | | |
+| … | | | | |
+
+Conclure en ordres de grandeur, sur la limite atteinte (calcul ou bande passante mémoire ?), et sur
+le fait qu'aucune version n'est la meilleure dans les deux régimes.
 
 ---
 
 ## 6. Bonus — gouvernance IA
 
-Voir `constitution.md` à la racine du dépôt. Expliquer en quelques lignes comment il a été utilisé pendant le TP.
+Voir `constitution.md` à la racine du dépôt. Montrer qu'il répond aux quatre directives du barème :
+
+1. **Rôle et posture** — §1 : ingénieur système raisonnant en cycles, lignes de cache et octets
+   alloués, interdiction de proposer du code sans hypothèse mesurable.
+2. **Contraintes négatives explicites** — §2 : interdits sur le hot path (`fmt.Sprintf`, conversions
+   `string ↔ []byte`, allocations non justifiées, goroutines non bornées, `%` dans la boucle
+   interne, `[][]T`, `map`, verrous par cellule).
+3. **Justification empirique** — §3 : tout gain proposé sous la forme « Hypothèse → Vérification »,
+   avec la commande exacte, et un gain non significatif (p > 0,05) déclaré comme tel.
+4. **Format impératif** — §4 : injonctions vérifiables, prose limitée, chiffres avec unités.
+
+Expliquer en quelques lignes comment il a été utilisé pendant le TP : ce qu'il a fait refuser, et ce
+qu'il a fait mesurer avant d'accepter.
