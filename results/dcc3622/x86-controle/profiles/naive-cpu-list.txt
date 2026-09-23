@@ -1,0 +1,60 @@
+Total: 7.94s
+ROUTINE ======================== gol-wildfire/internal/naive.(*Sim).Burning in /mnt/d/COURS/SDV_2026_2027/Optimisations peformances backend/jdv/internal/naive/naive.go
+     180ms      180ms (flat, cum)  2.27% of Total
+         .          .     72:func (s *Sim) Burning() int {
+         .          .     73:	n := 0
+      10ms       10ms     74:	for y := range s.grid {
+     100ms      100ms     75:		for x := range s.grid[y] {
+      70ms       70ms     76:			if s.grid[y][x].feu > 0 {
+         .          .     77:				n++
+         .          .     78:			}
+         .          .     79:		}
+         .          .     80:	}
+         .          .     81:	return n
+ROUTINE ======================== gol-wildfire/internal/naive.(*Sim).Step in /mnt/d/COURS/SDV_2026_2027/Optimisations peformances backend/jdv/internal/naive/naive.go
+     3.67s      7.53s (flat, cum) 94.84% of Total
+         .          .     88:func (s *Sim) Step() {
+      10ms       40ms     89:	ignite := make([]bool, s.carte.Width*s.carte.Height)
+      10ms       10ms     90:	for y := range s.grid {
+      40ms       40ms     91:		for x := range s.grid[y] {
+     140ms      140ms     92:			if s.grid[y][x].feu == 0 {
+         .          .     93:				continue
+         .          .     94:			}
+         .          .     95:			// Une case vent épargne son secteur amont et projette le feu deux
+         .          .     96:			// cases sous le vent, par-dessus ce qui s'y trouve (§5).
+     110ms      930ms     97:			d, vente := s.carte.WindAt(x, y)
+     150ms      150ms     98:			for j, v := range fire.Offsets {
+         .          .     99:				if vente {
+     600ms      600ms    100:					if secteur := fire.Mod(j-int(d), 8); secteur >= 3 && secteur <= 5 {
+         .          .    101:						continue
+         .          .    102:					}
+         .          .    103:				}
+     370ms      3.31s    104:				ignite[s.carte.At(x+v[0], y+v[1])] = true
+         .          .    105:			}
+         .          .    106:			if vente {
+      30ms       30ms    107:				v := fire.Offsets[d]
+         .       10ms    108:				ignite[s.carte.At(x+2*v[0], y+2*v[1])] = true
+         .          .    109:			}
+         .          .    110:		}
+         .          .    111:	}
+         .          .    112:
+         .          .    113:	for y := range s.grid {
+      70ms       70ms    114:		for x := range s.grid[y] {
+     170ms      170ms    115:			i := y*s.carte.Width + x
+     150ms      150ms    116:			terrain := s.carte.Terrain[i]
+     210ms      210ms    117:			c := &s.grid[y][x]
+         .          .    118:			switch {
+     310ms      310ms    119:			case c.feu > 0:
+     210ms      210ms    120:				c.feu--
+     190ms      190ms    121:				if c.feu == 0 {
+      80ms       90ms    122:					c.repos = terrain.Repos()
+         .          .    123:				}
+     270ms      270ms    124:			case c.repos > 0:
+     240ms      240ms    125:				c.repos--
+     270ms      320ms    126:			case ignite[i] && terrain.Combustion() > 0:
+      40ms       40ms    127:				c.feu = terrain.Combustion()
+         .          .    128:			}
+         .          .    129:		}
+         .          .    130:	}
+         .          .    131:}
+         .          .    132:

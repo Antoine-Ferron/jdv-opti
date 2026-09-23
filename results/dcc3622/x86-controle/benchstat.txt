@@ -1,0 +1,46 @@
+goos: linux
+goarch: amd64
+pkg: gol-wildfire/internal/bench
+cpu: Intel(R) Core(TM) Ultra 9 275HX
+                                       │    naive     │
+                                       │    sec/op    │
+Step/scenario=embrasement/size=256-24    1.087m ±  2%
+Step/scenario=embrasement/size=1024-24   12.81m ±  1%
+Step/scenario=embrasement/size=2048-24   31.06m ±  3%
+Fingerprint/size=1024-24                 20.60m ±  4%
+Run/scenario=front/size=512-24           72.97m ± 12%
+Run/scenario=front/size=1024-24          285.5m ± 18%
+Run/scenario=embrasement/size=512-24     70.52m ±  1%
+Run/scenario=embrasement/size=1024-24    202.0m ±  3%
+geomean                                  35.71m
+
+                                       │    naive     │
+                                       │     B/s      │
+Step/scenario=embrasement/size=256-24    57.51Mi ± 2%
+Step/scenario=embrasement/size=1024-24   78.08Mi ± 1%
+Step/scenario=embrasement/size=2048-24   128.8Mi ± 3%
+geomean                                  83.31Mi
+
+                                       │    naive     │
+                                       │     B/op     │
+Step/scenario=embrasement/size=256-24    64.00Ki ± 0%
+Step/scenario=embrasement/size=1024-24   1.000Mi ± 0%
+Step/scenario=embrasement/size=2048-24   4.000Mi ± 0%
+Fingerprint/size=1024-24                 16.83Mi ± 0%
+Run/scenario=front/size=512-24           13.01Mi ± 0%
+Run/scenario=front/size=1024-24          52.03Mi ± 0%
+Run/scenario=embrasement/size=512-24     13.01Mi ± 0%
+Run/scenario=embrasement/size=1024-24    52.03Mi ± 0%
+geomean                                  6.104Mi
+
+                                       │    naive    │
+                                       │  allocs/op  │
+Step/scenario=embrasement/size=256-24     1.000 ± 0%
+Step/scenario=embrasement/size=1024-24    1.000 ± 0%
+Step/scenario=embrasement/size=2048-24    1.000 ± 0%
+Fingerprint/size=1024-24                 451.2k ± 0%
+Run/scenario=front/size=512-24            564.0 ± 0%
+Run/scenario=front/size=1024-24          1.076k ± 0%
+Run/scenario=embrasement/size=512-24      564.0 ± 0%
+Run/scenario=embrasement/size=1024-24    1.076k ± 0%
+geomean                                   142.1

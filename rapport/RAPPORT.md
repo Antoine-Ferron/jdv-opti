@@ -190,10 +190,12 @@ banc seront cités, en regard de ceux du banc A.
 
 ## 2. Diagnostic matériel & profiling réel — /5
 
-> **Captures : `rapport/figures/<banc>/<vue>-<implémentation>.png`.** Les profils de cette section
-> viennent tous du commit `a47848f`, carte 1024 × 1024, 64 foyers, 500 tours demandés
-> (`make profile BANC=<nom>`). Les captures du banc A sont conservées sans encadrés ajoutés, la
-> légende et le texte explicitant les fonctions importantes ; celle du banc B porte des annotations.
+> **Captures : `rapport/figures/<banc>/<vue>-<implémentation>.png`.** Carte 1024 × 1024, 64 foyers,
+> 500 tours demandés (`make profile BANC=<nom>`). **Aucune capture n'est retouchée** : ce sont les
+> sorties brutes de pprof, et l'annotation tient dans la légende, qui nomme les zones à lire et les
+> chiffre. Une campagne rejouée ne demande ainsi que la mise à jour du texte — d'autant que les
+> pourcentages d'un profil ont une incertitude de plusieurs points d'une exécution à l'autre, à code
+> identique.
 
 ### 2.1 Profil CPU de la baseline
 
@@ -226,10 +228,17 @@ Fingerprint n'est pas appelé par fire.Run et n'apparaît donc pas dans ce profi
 
 ![Flamegraph CPU baseline sur x86](figures/x86-controle/flame-cpu-naive.png)
 
-*Figure 3 — **Banc B** (Intel Core Ultra 9 275HX, WSL2), contrôle de portabilité. Même commit et
-même charge. Profil : `results/a47848f/x86-controle/profiles/naive-cpu.prof`, 7,66 s d'échantillons
-sur 7,50 s. En rouge le chemin de propagation, en vert celui du vent : deux descentes distinctes
-vers la même fonction Mod, dont la largeur cumulée n'a pas d'équivalent sur la figure 1.*
+*Figure 3 — **Banc B** (Intel Core Ultra 9 275HX, WSL2), contrôle de portabilité. Même code et même
+charge que la figure 1. Profil : `results/dcc3622/x86-controle/profiles/naive-cpu.prof`, 7,94 s
+d'échantillons sur 7,71 s. Deux zones à lire :*
+
+- *le large bloc central `fire.Map.At → fire.Mod`, directement sous Step : **3,31 s, soit 42 % du
+  CPU** — c'est `naive.go:104`, deux divisions entières par voisin et huit voisins par case en feu ;*
+- *la pile de droite `fire.Map.WindAt → fire.Map.At → fire.Mod` : **0,82 s, 10 % du CPU**, alors
+  qu'1 % seulement des cases portent du vent — c'est `naive.go:97`, où WindAt refait lui-même un
+  Map.At pour découvrir presque toujours qu'il n'y a pas de vent.*
+
+*Ni l'une ni l'autre n'a d'équivalent sur la figure 1 : Mod y pèse 7,9 % contre 41,1 % ici.*
 
 Source : [profil CPU x86](../results/a47848f/x86-controle/profiles/naive-cpu-top.txt).
 Ce profil couvre 7,50 s et totalise 7,66 s d'échantillons CPU.
@@ -309,6 +318,28 @@ partie du processus mesuré par Hyperfine.
 Sources des micro-mesures : [benchstat](../results/a47848f/m1-air/benchstat.txt)
 et [résultats bruts](../results/a47848f/m1-air/bench.txt). Les comptes d'allocations
 sont ceux mesurés sur M1 ; leur égalité sur un autre environnement doit être vérifiée.
+
+#### Le même filtre sur les deux bancs
+
+Les deux captures suivantes sont les mêmes vues que les figures 1 et 3, avec `Mod` saisi dans le
+champ *Search regexp* de pprof : l'outil encadre lui-même les cadres correspondants, sans retouche
+d'image, et le champ reste visible dans la capture — n'importe qui peut la reproduire.
+
+![Filtre Mod sur le profil M1](figures/m1-air/flame-cpu-mod-naive.png)
+
+*Figure 4 — **Banc A** (M1). Le cadre `fire.Mod` encadré occupe environ 7 % de la largeur du
+graphe ; `Burning` et `Terrain.Combustion`, à sa droite, pèsent ici un poids comparable.*
+
+![Filtre Mod sur le profil x86](figures/x86-controle/flame-cpu-mod-naive.png)
+
+*Figure 5 — **Banc B** (x86). Même filtre, même code, même charge : le cadre `fire.Mod` occupe
+environ 35 % de la largeur, cinq fois plus qu'à la figure 4.*
+
+**C'est le résultat central du diagnostic**, et il n'aurait pas été visible avec un seul banc : la
+division entière du modulo torique domine le profil x86 et reste marginale sur ARM. Une optimisation
+qui la supprime doit donc être attendue comme un gain majeur sur le banc B et modeste sur le banc A
+— hypothèse à vérifier par la mesure, l'écart de coût d'instruction entre les deux jeux
+d'instructions n'étant pas établi par ces seuls profils.
 
 #### Pistes de portabilité issues du diagnostic x86
 
