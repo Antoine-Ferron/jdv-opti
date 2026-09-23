@@ -177,7 +177,7 @@ banc seront cités, en regard de ceux du banc A.
 ![Flamegraph CPU baseline](figures/flame-cpu-naive.png)
 
 Annoter la capture : encadrer `Fingerprint` → `fmt.Sprintf`, et `Step` → la boucle de propagation.
-Source : `results/profiles/naive-cpu-top.txt`, `naive-cpu-list.txt` (coût ligne par ligne, produit
+Source : `results/<commit>/<banc>/profiles/naive-cpu-top.txt` et `naive-cpu-list.txt` (coût ligne par ligne, produits
 par `make profile IMPL=naive`).
 
 ### 2.2 Profil d'allocations

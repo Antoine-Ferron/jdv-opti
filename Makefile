@@ -5,7 +5,8 @@ TURNS ?= 500
 FIRES ?= 64
 ADDR  ?= 127.0.0.1:8081
 BANC  ?= $(shell uname -s)-$(shell uname -m)
-PROF  := results/profiles
+COMMIT := $(shell git rev-parse --short HEAD)
+PROF  := results/$(COMMIT)/$(BANC)/profiles
 
 .PHONY: help build test env bench quick demo web profile flame layout escape tools clean
 
@@ -30,7 +31,7 @@ quick: build ## Exécution rapide d'une implémentation (IMPL=, SIZE=, TURNS=, F
 demo: build ## Incendie animé en console, à taille d'écran
 	./bin/wildfire -w 100 -h 35 -turns 400 -fires 2 -render
 
-profile: build ## Profils CPU + allocations de IMPL (axe 2)
+profile: build ## Profils CPU + allocations de IMPL -> results/<commit>/<banc>/profiles/
 	@mkdir -p $(PROF)
 	./bin/wildfire -impl $(IMPL) -size $(SIZE) -turns $(TURNS) -fires $(FIRES) -quiet \
 		-cpuprofile $(PROF)/$(IMPL)-cpu.prof -memprofile $(PROF)/$(IMPL)-mem.prof
@@ -38,7 +39,7 @@ profile: build ## Profils CPU + allocations de IMPL (axe 2)
 	go tool pprof -sample_index=alloc_space -top -nodecount=15 bin/wildfire $(PROF)/$(IMPL)-mem.prof | tee $(PROF)/$(IMPL)-mem-top.txt
 	go tool pprof -list 'Step|Fingerprint|Burning' bin/wildfire $(PROF)/$(IMPL)-cpu.prof > $(PROF)/$(IMPL)-cpu-list.txt
 
-flame: ## Ouvre pprof dans le navigateur (menu View > Flame Graph) pour les captures
+flame: ## Ouvre pprof dans le navigateur (View > Flame Graph) pour capturer les figures
 	go tool pprof -http=localhost:8080 bin/wildfire $(PROF)/$(IMPL)-cpu.prof
 
 layout: ## Taille des structs (axe padding)
