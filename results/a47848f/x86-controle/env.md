@@ -1,5 +1,5 @@
-# Banc d'essai — 2026-09-23T10:42:18+02:00
-Commit : 19a9deb
+# Banc d'essai — 2026-09-23T10:59:26+02:00
+Commit : a47848f
 
 ## CPU
 Architecture:                            x86_64
@@ -21,7 +21,7 @@ Taille de ligne de cache (L1d) : 64 octets
 
 ## Mémoire
                total        used        free      shared  buff/cache   available
-Mem:            31Gi       805Mi        30Gi        15Mi       378Mi        30Gi
+Mem:            31Gi       795Mi        30Gi        15Mi       198Mi        30Gi
 Swap:          8.0Gi          0B       8.0Gi
 
 ## Système
@@ -31,13 +31,13 @@ ATTENTION : WSL détecté — le mentionner dans le rapport (virtualisation Hype
 
 ## Sources de bruit
 Gouverneur CPU : non exposé (VM/WSL ?)
-Charge moyenne : 0.02 0.21 0.23
+Charge moyenne : 0.00 0.09 0.25
 Processus les plus gourmands :
 %CPU COMMAND
- 0.8 make
- 0.0 wsl-pro-service
- 0.0 systemd
+ 1.1 bash
+ 0.2 bash
  0.0 systemd-udevd
+ 0.0 systemd
  0.0 polkitd
 
 ## Runtime

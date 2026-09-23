@@ -1,0 +1,24 @@
+File: wildfire
+Build ID: f01b8450b0c9cb60d5a66f30ee848bc0bcd6274d
+Type: cpu
+Time: 2026-09-23 11:06:24 CEST
+Duration: 7.50s, Total samples = 7.66s (102.15%)
+Showing nodes accounting for 7.51s, 98.04% of 7.66s total
+Dropped 24 nodes (cum <= 0.04s)
+Showing top 15 nodes out of 18
+      flat  flat%   sum%        cum   cum%
+     3.81s 49.74% 49.74%      7.26s 94.78%  gol-wildfire/internal/naive.(*Sim).Step
+     2.78s 36.29% 86.03%      2.78s 36.29%  gol-wildfire/internal/fire.Mod (inline)
+     0.32s  4.18% 90.21%      0.79s 10.31%  gol-wildfire/internal/fire.Map.WindAt (inline)
+     0.27s  3.52% 93.73%      3.04s 39.69%  gol-wildfire/internal/fire.Map.At (inline)
+     0.21s  2.74% 96.48%      0.21s  2.74%  gol-wildfire/internal/naive.(*Sim).Burning
+     0.11s  1.44% 97.91%      0.11s  1.44%  runtime.procyieldAsm
+     0.01s  0.13% 98.04%      0.14s  1.83%  runtime.suspendG
+         0     0% 98.04%      7.47s 97.52%  gol-wildfire/internal/fire.Run
+         0     0% 98.04%      7.47s 97.52%  main.main
+         0     0% 98.04%      0.18s  2.35%  runtime.gcBgMarkWorker
+         0     0% 98.04%      0.18s  2.35%  runtime.gcBgMarkWorker.func2
+         0     0% 98.04%      0.18s  2.35%  runtime.gcDrain
+         0     0% 98.04%      0.18s  2.35%  runtime.gcDrainMarkWorkerDedicated (inline)
+         0     0% 98.04%      7.47s 97.52%  runtime.main
+         0     0% 98.04%      0.15s  1.96%  runtime.markroot

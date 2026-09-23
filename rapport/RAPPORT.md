@@ -152,12 +152,12 @@ variance, CV) et commenter le coefficient de variation.
 
 #### Banc B — contrôle
 
-Première campagne, commit `19a9deb`, carte 1024², 64 foyers, 500 tours, Hyperfine `-N --warmup 3
---runs 15` (`results/19a9deb/x86-controle/`) :
+Campagne de référence, commit `a47848f`, carte 1024², 64 foyers, 500 tours, Hyperfine `-N --warmup 3
+--runs 15` (`results/a47848f/x86-controle/`) :
 
 | Moyenne | Médiane | Écart-type | Variance | CV | Min | Max |
 |---|---|---|---|---|---|---|
-| 8,4300 s | 8,3872 s | 0,1353 s | 1,831 × 10⁻² s² | **1,6 %** | 8,2862 s | 8,7089 s |
+| 8,2574 s | 8,2408 s | 0,0893 s | 7,976 × 10⁻³ s² | **1,1 %** | 8,1320 s | 8,5106 s |
 
 Coefficient de variation à 1,6 %, sous le seuil de 2 % : la mesure est stable malgré une fréquence
 non verrouillée et la virtualisation WSL2 — c'est le warmup et le nombre de runs qui l'assurent.
@@ -176,7 +176,26 @@ banc seront cités, en regard de ceux du banc A.
 
 ![Flamegraph CPU baseline](figures/flame-cpu-naive.png)
 
-Annoter la capture : encadrer `Fingerprint` → `fmt.Sprintf`, et `Step` → la boucle de propagation.
+Annoter la capture : encadrer `Step` → `Map.At` → `fire.Mod`.
+
+Relevé du banc B (`naive`, 1024², 64 foyers, 500 tours, 7,5 s de profil) :
+
+| Fonction | CPU à plat | CPU cumulé |
+|---|---|---|
+| `naive.(*Sim).Step` | 49,7 % | 94,8 % |
+| **`fire.Mod`** (le modulo torique) | **36,3 %** | 36,3 % |
+| `fire.Map.At` | 3,5 % | 39,7 % |
+| `fire.Map.WindAt` | 4,2 % | 10,3 % |
+| `naive.(*Sim).Burning` | 2,7 % | 2,7 % |
+| `runtime.gcBgMarkWorker` | — | 2,4 % |
+
+**Le ramasse-miettes ne coûte que 2,4 %** alors que la baseline alloue 490 Mo sur l'exécution : les
+allocations sont peu nombreuses mais énormes (1 Mio par tour), donc recyclées sans effort. `[F3]`
+est un défaut de volume mémoire, pas de temps CPU — à ne pas présenter comme un goulot.
+
+**`Fingerprint` n'apparaît pas dans ce profil**, et c'est normal : le binaire n'appelle pas
+l'empreinte, faute de détection de cycles (REGLES.md §6). Son coût est établi par micro-benchmark
+au §2.3, pas par ce profil.
 Source : `results/<commit>/<banc>/profiles/naive-cpu-top.txt` et `naive-cpu-list.txt` (coût ligne par ligne, produits
 par `make profile IMPL=naive`).
 
@@ -184,8 +203,20 @@ par `make profile IMPL=naive`).
 
 ![Flamegraph allocations baseline](figures/flame-alloc-naive.png)
 
-Chiffres attendus : allocations par tour (`allocs/op` de `BenchmarkStep` et `BenchmarkFingerprint`),
-octets alloués, part du temps passée dans `runtime.mallocgc` et dans le GC (`GODEBUG=gctrace=1`).
+Relevé du banc B, même exécution (596 Mo alloués au total) :
+
+| Origine | Alloué | Part |
+|---|---|---|
+| `naive.(*Sim).Step` | **490 Mo** | 82,2 % |
+| `fire.Generate` (hors chronomètre de la simulation) | 103 Mo | 17,3 % |
+
+Les 490 Mo de `Step` sont exactement les 500 tampons d'ignition de 1 Mio alloués par les 500 tours
+— `[F3]`, un tampon jeté et réalloué à chaque tour alors qu'un seul suffirait. À rapprocher des
+`allocs/op` du §2.3 : **une** allocation par tour, mais d'un mégaoctet.
+
+Les 103 Mo de `fire.Generate` sont hors du périmètre chronométré des micro-benchmarks ; ils
+expliquent en revanche une part du temps mesuré par Hyperfine, et c'est ce qui a conduit à porter la
+charge à 500 tours (§1.2).
 
 ### 2.3 Identification formelle du hot path
 
@@ -205,14 +236,38 @@ Pour chaque goulot, l'enchaînement **symptôme mesuré → cause mécanique →
    bancs ; seuls les temps sont à reconfirmer sur le banc A. Le rapport de 1,7 est le premier
    résultat exploitable de l'audit : **l'empreinte coûte plus cher que le calcul qu'elle
    accompagne**, alors qu'elle n'est qu'un moyen de détecter un état déjà vu.
-2. **La propagation, xx % du CPU `[F5]` `[F1]`** — 8 modulos par case en feu (division entière), un
-   de plus pour le saut du vent (REGLES.md §5), et une double indirection `[][]Cell` : chaque ligne
-   est un bloc distinct du tas, les lignes *y-1*, *y* et *y+1* ne sont pas contiguës.
+2. **Le modulo torique, 36,3 % du CPU à lui seul `[F5]`** — et c'est le premier goulot en temps
+   d'exécution, devant tout le reste. `fire.Mod` est appelé deux fois par voisin (une par axe) pour
+   chaque case en feu, soit seize divisions entières par case, plus celles du saut du vent
+   (REGLES.md §5). Coût ligne par ligne, relevé sur `internal/naive/naive.go` :
+
+   | Ligne | Code | CPU cumulé |
+   |---|---|---|
+   | 104 | `ignite[s.carte.At(x+v[0], y+v[1])] = true` | **2,86 s / 7,5 s — 38 %** |
+   | 97 | `d, vente := s.carte.WindAt(x, y)` | 0,85 s — 11 % |
+   | 100 | `fire.Mod(j-int(d), 8)` (secteur amont) | 0,84 s — 11 % |
+
+   Deux enseignements. D'abord, l'enroulement torique se paie par une division entière là où un
+   masque suffirait pour des dimensions en puissance de deux, ou une bordure fantôme dans le cas
+   général. Ensuite, `WindAt` coûte 11 % alors que **1 % des cases seulement portent du vent** : il
+   est interrogé pour chaque case en feu et refait lui-même un `Map.At`, donc deux modulos, pour
+   découvrir presque toujours qu'il n'y a pas de vent.
 3. **Le balayage intégral `[F4]`** — `Step` parcourt toute la carte pour appliquer les transitions,
    alors que **seules les cases en feu propagent** (REGLES.md §4). C'est le gisement propre à ce
    modèle, celui qu'un automate à grille dense n'offre pas.
-4. **Un tampon d'ignition alloué par tour `[F3]`**, plus `Burning()` qui recompte toute la carte à
-   chaque appel.
+4. **Un tampon d'ignition alloué par tour `[F3]`** — 490 Mo sur l'exécution (§2.2), mais seulement
+   2,4 % de CPU passé dans le GC : c'est un défaut de volume, pas de vitesse. `Burning()`, qui
+   recompte toute la carte à chaque appel, pèse 2,7 %.
+
+**Ordre de traitement qui en découle**, et qui n'est pas celui qu'on aurait supposé :
+
+| Rang | Cible | Preuve | Gisement |
+|---|---|---|---|
+| 1 | `fire.Mod` `[F5]` | 36,3 % du CPU | masque ou bordure fantôme |
+| 2 | `Fingerprint` `[F6]` | 1,7 × un tour, 451 200 allocs | hachage sans allocation |
+| 3 | `WindAt` appelé partout | 11 % pour 1 % de cases ventées | index direct |
+| 4 | balayage intégral `[F4]` | — | liste des cases actives |
+| 5 | `[F1]`, `[F2]`, `[F3]` | GC à 2,4 % | gains de mémoire, pas de temps |
 
 ### 2.4 Deux pièges de lecture, à écarter avant d'interpréter
 
