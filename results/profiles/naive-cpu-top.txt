@@ -1,0 +1,17 @@
+File: wildfire
+Type: cpu
+Time: 2026-09-23 09:49:27 CEST
+Duration: 302.54ms, Total samples = 170ms (56.19%)
+Showing nodes accounting for 170ms, 100% of 170ms total
+      flat  flat%   sum%        cum   cum%
+     110ms 64.71% 64.71%      110ms 64.71%  gol-wildfire/internal/naive.(*Sim).Step
+      50ms 29.41% 94.12%       50ms 29.41%  gol-wildfire/internal/naive.(*Sim).Burning
+      10ms  5.88%   100%       10ms  5.88%  runtime.madvise
+         0     0%   100%      160ms 94.12%  gol-wildfire/internal/fire.Run
+         0     0%   100%      160ms 94.12%  main.main
+         0     0%   100%       10ms  5.88%  runtime.(*mheap).alloc.func1
+         0     0%   100%       10ms  5.88%  runtime.(*mheap).allocSpan
+         0     0%   100%      160ms 94.12%  runtime.main
+         0     0%   100%       10ms  5.88%  runtime.sysUsed (inline)
+         0     0%   100%       10ms  5.88%  runtime.sysUsedOS (inline)
+         0     0%   100%       10ms  5.88%  runtime.systemstack
