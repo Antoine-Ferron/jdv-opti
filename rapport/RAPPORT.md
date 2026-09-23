@@ -478,19 +478,76 @@ version qui casse une règle est rejetée avant d'être mesurée.
 
 ### 3.3 I/O réseau & persistance
 
-*Cet axe n'a encore aucun support dans le code : les snapshots, la base et le cache sont à écrire.
-Plan de travail dans l'ordre ci-dessous, un commit par étape.*
+**Deux natures de mesure, à ne pas confondre.** La *taille* produite par un format ne dépend pas de
+la machine : elle est mesurée une fois et vaut pour les deux bancs. Le *temps* de sérialisation, lui,
+est une mesure CPU comme les autres et suit la règle générale — banc A pour la référence, banc B pour
+le contrôle de portabilité. Les tailles ci-dessous sont donc définitives ; les temps sont ceux du
+banc B, à confirmer par la prochaine campagne du banc A.
 
-- **Sérialisation** : snapshot de l'état d'un tour, d'abord en JSON naïf (baseline de l'axe : un
-  tableau de structures par case), puis en **format binaire compact** — 4 bits par case, terrain et
-  vent envoyés une seule fois puisqu'ils sont immuables. Mesurer les deux : taille du fichier et
-  temps de sérialisation. Protobuf ou un encodage maison, à justifier.
+Le snapshot reste **hors du chemin chronométré** de la simulation : `fire.Options` reçoit un rappel
+`Snapshot`, nil par défaut, si bien que les mesures du §2 ne paient qu'une comparaison par tour.
+C'est un rappel plutôt qu'un format concret, `internal/snapshot` important déjà `internal/fire`.
+
+#### Étape I/O-1 — snapshot JSON (baseline de l'axe)
+
+> **Modification :** package `internal/snapshot`, avec une interface `Format` et une suite de
+> conformité qui vérifie, pour chaque format, que **ce qui est écrit est relu à l'identique** —
+> sans quoi comparer des tailles n'aurait aucun sens, le plus compact étant celui qui perd le plus
+> d'information.
+> **Défauts volontaires :** `[S1]` une structure par case avec ses noms de champs répétés ;
+> `[S2]` le décor réécrit à chaque snapshot alors qu'il est immuable ; `[S3]` encodage texte ;
+> `[S4]` état entièrement matérialisé avant écriture.
+> **Résultat (carte 1024²) :** 120 410 181 octets, soit **114,83 octets par case** — pour un état
+> qui tient sur 4 bits.
+
+#### Étape I/O-2 — Protobuf
+
+> **Hypothèse d'impact :** supprimer les noms de champs répétés et l'encodage texte doit ramener le
+> coût à quelques octets par case ; le plancher sera le varint, qui ne descend pas sous un octet.
+> **Modification :** `internal/snapshot/snapshot.proto`, quatre grilles `repeated uint32` en
+> `[packed = true]` — sans quoi l'étiquette du champ serait réécrite devant chaque valeur.
+> **Commande de vérification :** `go test ./internal/snapshot/` et
+> `go test ./internal/bench -run '^$' -bench 'Snapshot' -benchmem`
+> **Résultat :** **4,00 octets par case**, exactement le plancher prévu — quatre grilles, un octet
+> de varint minimum par valeur. Gain **×28,7** sur JSON.
+
+#### Étape I/O-3 — format bit-packé
+
+> **Hypothèse d'impact :** `feu` ≤ 2 et `repos` ≤ 3 tiennent chacun sur 2 bits (`REGLES.md` §2),
+> donc deux cases par octet ; et le décor étant immuable, il n'a à être écrit qu'une fois par série.
+> **Modification :** `internal/snapshot/packed.go`, en-tête de 17 octets puis un quartet par case,
+> avec un drapeau qui rend le décor optionnel.
+> **Résultat :** **1,50 octet par case** avec le décor, **0,50 avec le décor omis** — soit
+> **×230 sur JSON** et ×8 sur Protobuf.
+
+#### Synthèse — sérialisation
+
+Carte 1024², état relevé au tour 50. Tailles indépendantes du banc ; temps et allocations mesurés sur
+le **banc B**, trois exécutions.
+
+| Format | Taille | Par case | Écriture | Alloué | Allocations |
+|---|---:|---:|---:|---:|---:|
+| JSON naïf | 120,4 Mo | 114,83 o | ~553 ms | 1,17 Go | quelques dizaines |
+| Protobuf | 4,19 Mo | 4,00 o | 17,0 ms | 21,0 Mo | 6 |
+| bit-packé | 1,57 Mo | 1,50 o | **1,40 ms** | 1,57 Mo | **3** |
+| bit-packé, décor omis | **0,52 Mo** | **0,50 o** | — | — | — |
+
+**Le temps suit la taille, mais plus vite qu'elle.** Entre JSON et le format bit-packé, la taille est
+divisée par 77 et le temps par 395. L'écart vient des allocations : produire 120 Mo de JSON en a
+demandé **1,17 Go**, le tampon de l'encodeur doublant à chaque dépassement, quand le format
+bit-packé alloue exactement sa sortie en **3 allocations**. Le débit par octet écrit le confirme :
+environ 1 120 Mo/s pour le format bit-packé contre 200 à 260 Mo/s pour les deux autres — ce ne sont
+pas seulement moins d'octets, ce sont des octets moins chers.
+
+#### À venir
+
 - **Base de données** : historique des tours (tour, empreinte, cases en feu, surface brûlée). Une
-  requête d'analyse — par exemple retrouver les tours dont l'empreinte se répète, ou la progression
-  de la surface brûlée — exécutée **sans puis avec index**, avec `EXPLAIN ANALYZE` avant/après et le
-  plan d'exécution commenté (`Seq Scan` → `Index Scan`).
-- **Cache** : `sync.Pool` sur les tampons de sérialisation (les snapshots sont périodiques et de
-  taille constante, c'est le cas d'usage idéal), et LRU des empreintes déjà vues.
+  requête d'analyse exécutée **sans puis avec index**, avec `EXPLAIN ANALYZE` avant/après et le plan
+  commenté (`Seq Scan` → `Index Scan`) ; puis insertion tour par tour contre envoi groupé (`COPY`),
+  qui est le vrai sujet d'I/O réseau — c'est le nombre d'allers-retours qui coûte, pas le volume.
+- **Cache** : `sync.Pool` sur les tampons de sérialisation, et LRU des empreintes déjà vues. À
+  mesurer et non à supposer : un pool inutile augmente la pression mémoire au lieu de la réduire,
+  et ferait un bon candidat pour le §4.
 
 ---
 
