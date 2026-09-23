@@ -163,12 +163,12 @@ temps ne sont pas directement comparables à cette mesure globale à 500 tours.
 
 #### Banc B — contrôle
 
-Première campagne, commit `19a9deb`, carte 1024², 64 foyers, 500 tours, Hyperfine `-N --warmup 3
---runs 15` (`results/19a9deb/x86-controle/`) :
+Campagne de référence, commit `a47848f`, carte 1024², 64 foyers, 500 tours, Hyperfine `-N --warmup 3
+--runs 15` (`results/a47848f/x86-controle/`) :
 
 | Moyenne | Médiane | Écart-type | Variance | CV | Min | Max |
 |---|---|---|---|---|---|---|
-| 8,4300 s | 8,3872 s | 0,1353 s | 1,831 × 10⁻² s² | **1,6 %** | 8,2862 s | 8,7089 s |
+| 8,2574 s | 8,2408 s | 0,0893 s | 7,976 × 10⁻³ s² | **1,1 %** | 8,1320 s | 8,5106 s |
 
 Coefficient de variation à 1,6 %, sous le seuil de 2 % : la mesure est stable malgré une fréquence
 non verrouillée et la virtualisation WSL2 — c'est le warmup et le nombre de runs qui l'assurent.
@@ -206,6 +206,26 @@ s'incluent : Map.At et Mod sont notamment compris dans Step et ne doivent pas
 être ajoutés à ses 90,48 %. Le profil CPU commence après la génération de carte.
 Fingerprint n'est pas appelé par fire.Run et n'apparaît donc pas dans ce profil.
 
+#### Observation complémentaire — banc B (x86, hors référence M1)
+
+Source : [profil CPU x86](../results/a47848f/x86-controle/profiles/naive-cpu-top.txt).
+Ce profil couvre 7,50 s et totalise 7,66 s d'échantillons CPU.
+
+| Fonction | CPU direct | CPU cumulé |
+|---|---:|---:|
+| Step | 49,74 % | 94,78 % |
+| Mod | 36,29 % | 36,29 % |
+| Map.At | 3,52 % | 39,69 % |
+| Map.WindAt | 4,18 % | 10,31 % |
+| Burning | 2,74 % | 2,74 % |
+| runtime.gcBgMarkWorker | 0 % | 2,35 % |
+
+Le modulo apparaît proportionnellement plus coûteux sur ce profil x86 que sur
+M1. Cette observation motive une vérification de portabilité, sans établir
+à elle seule la cause matérielle. Les 2,35 % de gcBgMarkWorker ne représentent
+pas tout le coût des allocations ou du GC : ils ne prouvent pas que supprimer
+le tampon alloué par tour serait sans effet sur le temps CPU.
+Fingerprint est absent des deux profils car fire.Run ne l'appelle pas.
 
 ### 2.2 Profil d'allocations
 
@@ -229,6 +249,16 @@ ne fait pas partie de l'exécution normale profilée ici.
 Une mesure spécifique des
 pauses et du temps GC reste à effectuer ; elle ne se déduit pas du volume alloué.
 
+#### Observation complémentaire — allocations du banc B
+
+Source : [profil alloc_space x86](../results/a47848f/x86-controle/profiles/naive-mem-top.txt).
+Sur 596,32 MB estimés par pprof, Step représente 490 MB (82,17 %) et Generate,
+appels inclus, 103,14 MB (17,30 %). Ces estimations cumulées confirment la même
+origine dominante des allocations que sur M1 ; elles ne sont pas un comptage
+exact des 500 tampons. Le micro-benchmark confirme séparément 1 Mio par Step.
+Generate est hors chronométrage des micro-benchmarks de simulation mais fait
+partie du processus mesuré par Hyperfine.
+
 ### 2.3 Identification formelle du hot path
 
 1. **Step : 90,48 % du CPU, appels inclus.** La propagation puis les transitions
@@ -251,6 +281,29 @@ Sources des micro-mesures : [benchstat](../results/a47848f/m1-air/benchstat.txt)
 et [résultats bruts](../results/a47848f/m1-air/bench.txt). Les comptes d'allocations
 sont ceux mesurés sur M1 ; leur égalité sur un autre environnement doit être vérifiée.
 
+#### Pistes de portabilité issues du diagnostic x86
+
+Le [profil par ligne x86](../results/a47848f/x86-controle/profiles/naive-cpu-list.txt)
+met en évidence le calcul des cibles via Map.At, la lecture du vent via WindAt
+et le calcul du secteur amont. WindAt est interrogé pour chaque case en feu,
+même si elle ne porte pas de vent ; il recalcule des indices toriques.
+
+Les pistes à comparer sur les deux bancs sont :
+
+- Enroulement torique : masque pour les dimensions en puissance de deux,
+  traitement général pour les autres dimensions.
+- Lecture du vent par indice direct, sans recalcul de coordonnées valides.
+- Réutilisation du tampon et stockage contigu, pour mesurer le gain réel en
+  allocations et en temps, sans l'inférer du seul profil GC.
+- Liste de cases actives, à valider selon la densité de feu.
+- Empreinte sans formatage, pour ses usages propres ; elle n'accélère pas
+  l'exécution actuelle de fire.Run.
+
+Les anciennes valeurs x86 de 12,19 ms et 20,62 ms ne décrivent pas la campagne
+courante a47848f : son [benchstat](../results/a47848f/x86-controle/benchstat.txt)
+rapporte respectivement 16,59 ms pour Step/embrasement/1024 et 20,12 ms pour
+Fingerprint/1024. Ces données restent un diagnostic du banc B, pas la référence M1.
+
 ### 2.4 Deux pièges de lecture, à écarter avant d'interpréter
 
 Ces deux observations ont été faites au cours de la mise au point, sur une autre machine que le banc
@@ -266,13 +319,12 @@ retenu : **elles sont méthodologiques, à reproduire ici avant d'être citées 
    utile : une machine plus lente ne fait pas apparaître un gain qui n'existe pas — c'est la
    mesure normalisée (cycles par case) qui démasque une implémentation coûteuse, pas le chronomètre.
 
-**Une variance résiduelle, et sa cause.** Dans la campagne de référence, deux mesures restent
-bruitées : `Step/embrasement/size=2048` (±13 %) et `Run/front/size=1024` (±19 %). Ce sont
-précisément les deux qui allouent le plus — 4,000 Mio par tour et 52,03 Mio par itération — et le
-GC y intervient à des moments variables. Autrement dit, **la baseline est instable parce qu'elle
-alloue** : c'est `[F3]`, et ces deux lignes devraient se resserrer d'elles-mêmes dès la première
-étape de l'axe mémoire. Conséquence à assumer d'ici là : sur ces deux lignes, un gain inférieur à
-~20 % ne sera pas déclaré significatif par benchstat.
+**Dispersion sur le banc B.** La campagne a47848f présente notamment des
+intervalles relatifs de ±17 % pour Step/embrasement/1024 et ±14 % pour
+Run/front/1024 (source : benchstat x86 ci-dessus). Les allocations et le GC
+sont des hypothèses d'explication, mais une attribution causale exige des
+mesures complémentaires. Aucun seuil universel de gain de 20 % ne peut en
+être déduit : la significativité sera évaluée sur les échantillons comparés.
 
 ---
 

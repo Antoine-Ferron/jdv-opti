@@ -4,22 +4,22 @@ pkg: gol-wildfire/internal/bench
 cpu: Intel(R) Core(TM) Ultra 9 275HX
                                        │    naive     │
                                        │    sec/op    │
-Step/scenario=embrasement/size=256-24    1.034m ±  1%
-Step/scenario=embrasement/size=1024-24   12.19m ±  1%
-Step/scenario=embrasement/size=2048-24   30.91m ± 13%
-Fingerprint/size=1024-24                 20.62m ±  4%
-Run/scenario=front/size=512-24           72.94m ±  4%
-Run/scenario=front/size=1024-24          245.5m ± 19%
-Run/scenario=embrasement/size=512-24     69.75m ±  1%
-Run/scenario=embrasement/size=1024-24    187.8m ±  3%
-geomean                                  34.23m
+Step/scenario=embrasement/size=256-24    1.379m ±  2%
+Step/scenario=embrasement/size=1024-24   16.59m ± 17%
+Step/scenario=embrasement/size=2048-24   30.75m ±  4%
+Fingerprint/size=1024-24                 20.12m ±  1%
+Run/scenario=front/size=512-24           71.84m ±  4%
+Run/scenario=front/size=1024-24          330.8m ± 14%
+Run/scenario=embrasement/size=512-24     71.03m ±  1%
+Run/scenario=embrasement/size=1024-24    197.5m ±  3%
+geomean                                  38.39m
 
                                        │     naive     │
                                        │      B/s      │
-Step/scenario=embrasement/size=256-24    60.48Mi ±  1%
-Step/scenario=embrasement/size=1024-24   82.01Mi ±  1%
-Step/scenario=embrasement/size=2048-24   129.4Mi ± 15%
-geomean                                  86.26Mi
+Step/scenario=embrasement/size=256-24    45.31Mi ±  2%
+Step/scenario=embrasement/size=1024-24   60.29Mi ± 21%
+Step/scenario=embrasement/size=2048-24   130.1Mi ±  4%
+geomean                                  70.84Mi
 
                                        │    naive     │
                                        │     B/op     │
