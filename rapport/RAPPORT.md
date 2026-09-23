@@ -168,19 +168,21 @@ banc seront cités, en regard de ceux du banc A.
 
 ## 2. Diagnostic matériel & profiling réel — /5
 
-> Les captures sont rangées par banc : **`rapport/figures/<banc>/<vue>-<implémentation>.png`**.
-> Celles ci-dessous viennent du **banc B** (profils : `results/a47848f/x86-controle/profiles/`),
-> produites avec `make profile` puis `make flame` (menu *View > Flame Graph*). **À refaire sur le
-> banc A**, qui fait foi, et **à annoter** avant rendu : le barème demande des captures annotées,
-> pas brutes.
+> **Captures : `rapport/figures/<banc>/<vue>-<implémentation>.png`.** Celles de cette section
+> viennent du **banc B** et sont annotées ; **celles du banc A restent à produire** — c'est lui qui
+> fait foi, les liens devront basculer dessus une fois disponibles. Les produire avec
+> `make profile BANC=<nom>` puis `make flame BANC=<nom>` (menu *View > Flame Graph*), et les annoter
+> avant rendu : le barème demande des captures annotées, pas brutes.
 
 ### 2.1 Profil CPU de la baseline
 
 ![Flamegraph CPU baseline](figures/x86-controle/flame-cpu-naive.png)
+*Figure 1 — **Banc B** (Intel Core Ultra 9 275HX, WSL2). `naive`, carte 1024², graine 42, 64 foyers,
+500 tours, commit `a47848f`. Profil : `results/a47848f/x86-controle/profiles/naive-cpu.prof`,
+7,66 s d'échantillons. En rouge le chemin de propagation, en vert celui du vent — deux descentes
+distinctes vers la même fonction `fire.Mod`.*
 
-Annoter la capture : encadrer `Step` → `Map.At` → `fire.Mod`.
-
-Relevé du banc B (`naive`, 1024², 64 foyers, 500 tours, 7,5 s de profil) :
+Chiffres correspondants :
 
 | Fonction | CPU à plat | CPU cumulé |
 |---|---|---|
@@ -204,8 +206,11 @@ par `make profile IMPL=naive`).
 ### 2.2 Profil d'allocations
 
 ![Flamegraph allocations baseline](figures/x86-controle/flame-alloc-naive.png)
+*Figure 2 — **Banc B** (Intel Core Ultra 9 275HX, WSL2). Même exécution que la figure 1, commit
+`a47848f`. Profil : `results/a47848f/x86-controle/profiles/naive-mem.prof`, échantillonné à
+`MemProfileRate = 4096` octets, 596,32 Mo alloués au total.*
 
-Relevé du banc B, même exécution (596 Mo alloués au total) :
+Chiffres correspondants :
 
 | Origine | Alloué | Part |
 |---|---|---|
