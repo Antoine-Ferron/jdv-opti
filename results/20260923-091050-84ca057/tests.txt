@@ -1,0 +1,8 @@
+?   	gol/cmd/gol	[no test files]
+ok  	gol/cmd/web	(cached)
+ok  	gol/internal/bench	(cached) [no tests to run]
+?   	gol/internal/engines	[no test files]
+ok  	gol/internal/flat	(cached)
+?   	gol/internal/life	[no test files]
+?   	gol/internal/lifetest	[no test files]
+ok  	gol/internal/naive	(cached)
