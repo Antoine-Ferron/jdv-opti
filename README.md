@@ -33,6 +33,26 @@ make web ADDR=0.0.0.0:8081      # puis ouvrir http://<ip-wsl>:8081
 hostname -I | awk '{print $1}'  # l'adresse à utiliser
 ```
 
+## Protocole à deux bancs
+
+Chaque étape d'optimisation est mesurée sur **les deux machines de l'équipe**, pour vérifier que le
+gain survit au changement d'architecture :
+
+| Banc | Rôle |
+|---|---|
+| MacBook Air M1 (ARM) | **référence** — tous les chiffres du rapport |
+| Intel Core Ultra 9 / WSL2 (x86) | contrôle — uniquement les *ratios* de gain, jamais les valeurs absolues |
+
+```bash
+make bench                  # campagne sur cette machine
+make bench BANC=m1-air      # nom de banc explicite
+```
+
+Les résultats atterrissent dans `results/<commit>/<banc>/` : le même commit mesuré sur les deux
+machines donne deux dossiers frères, directement comparables. Le pipeline **refuse de mesurer sur un
+arbre de travail modifié** (`FORCE=1` pour passer outre, à éviter) — un dossier de résultats doit
+toujours correspondre au code du commit qu'il nomme.
+
 ## La commande `wildfire`
 
 Les cibles `make` appellent toutes le même binaire. En direct :

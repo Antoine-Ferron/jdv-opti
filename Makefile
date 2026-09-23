@@ -4,6 +4,7 @@ SIZE  ?= 1024
 TURNS ?= 50
 FIRES ?= 64
 ADDR  ?= 127.0.0.1:8081
+BANC  ?= $(shell uname -s)-$(shell uname -m)
 PROF  := results/profiles
 
 .PHONY: help build test env bench quick demo web profile flame layout escape tools clean
@@ -20,8 +21,8 @@ test: ## Conformité de toutes les implémentations (internal/firetest)
 env: ## Décrit le banc d'essai (axe 1)
 	@./scripts/env.sh
 
-bench: ## Pipeline complet : env + tests + go bench + hyperfine + benchstat (axe 5)
-	./scripts/run_benchmarks.sh
+bench: ## Campagne complète sur ce banc (BANC=, SIZE=, TURNS=) -> results/<commit>/<banc>/
+	BANC=$(BANC) SIZE=$(SIZE) TURNS=$(TURNS) ./scripts/run_benchmarks.sh
 
 quick: build ## Exécution rapide d'une implémentation (IMPL=, SIZE=, TURNS=, FIRES=)
 	./bin/wildfire -impl $(IMPL) -size $(SIZE) -turns $(TURNS) -fires $(FIRES)

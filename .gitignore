@@ -13,3 +13,5 @@
 /.idea/vcs.xml
 # Sujet/barème fournis par l'école, pas des sources du projet
 /rapport/*.pdf
+# Raccourci généré par l'ancien pipeline : deux postes le font pointer ailleurs
+/results/latest

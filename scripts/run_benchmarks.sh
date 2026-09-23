@@ -5,9 +5,12 @@
 # Usage : ./scripts/run_benchmarks.sh            (ou : make bench)
 # Paramètres surchargeables par variables d'environnement :
 #   IMPLS="naive flat"  SIZE=1024  TURNS=50  WARMUP=3  RUNS=15  COUNT=10  BENCH=.
+#   BANC=m1-air   nom du banc d'essai (défaut : <système>-<architecture>)
+#   FORCE=1       mesurer malgré un arbre de travail modifié (à éviter)
 #
-# Chaque exécution produit un dossier results/<date>-<commit>/ à versionner :
-# ce sont les pièces à conviction du rapport.
+# Chaque exécution produit un dossier results/<commit>/<banc>/ à versionner : le
+# même commit mesuré sur deux machines donne deux dossiers frères, directement
+# comparables. Ce sont les pièces à conviction du rapport.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -17,16 +20,29 @@ WARMUP=${WARMUP:-3}
 RUNS=${RUNS:-15}
 COUNT=${COUNT:-10}
 BENCH=${BENCH:-.}
+BANC=${BANC:-$(uname -s)-$(uname -m)}
+BANC=$(echo "$BANC" | tr '[:upper:] ' '[:lower:]-')
 
 need() { command -v "$1" >/dev/null || { echo "ERREUR : '$1' introuvable. $2" >&2; exit 1; }; }
 need go "Installez Go : https://go.dev/dl/"
 need hyperfine "Installez-le : 'sudo apt install hyperfine' ou 'cargo install hyperfine'."
 
+# Une campagne lancée sur un arbre modifié n'est pas reproductible : le dossier
+# results/ porterait un commit qui ne correspond pas au code mesuré.
+if ! git diff --quiet HEAD 2>/dev/null && [ "${FORCE:-0}" != 1 ]; then
+	echo "ERREUR : l'arbre de travail est modifié, la campagne ne serait pas reproductible." >&2
+	echo "         Commitez d'abord, ou forcez avec FORCE=1 (le dossier sera marqué comme tel)." >&2
+	git status --short >&2
+	exit 1
+fi
+
 commit=$(git rev-parse --short HEAD 2>/dev/null || echo nogit)
-out="results/$(date +%Y%m%d-%H%M%S)-${commit}"
+out="results/${commit}/${BANC}"
+if [ -d "$out" ]; then
+	echo ">> Campagne existante pour ce commit et ce banc : elle sera remplacée."
+fi
 mkdir -p "$out"
-ln -sfn "$(basename "$out")" results/latest
-echo ">> Résultats dans $out"
+echo ">> Banc : $BANC — résultats dans $out"
 
 echo ">> [1/6] Description du banc d'essai"
 ./scripts/env.sh >"$out/env.md"

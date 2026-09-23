@@ -20,12 +20,25 @@ et les deux leviers principaux.
 
 ### 1.1 Banc d'essai matériel
 
-Source : `results/<run>/env.md`, généré par `make env`.
+Source : `results/<commit>/<banc>/env.md`, généré par `make env` au début de chaque campagne.
 
-> **Banc retenu : le MacBook Air M1.** Les valeurs ci-dessous viennent d'un relevé `make env`
-> antérieur et sont **à confirmer** par la première campagne officielle. Toute mesure produite sur
-> une autre machine est écartée du rapport : les ratios de gain ne sont comparables qu'à matériel
-> constant.
+**Deux bancs, deux rôles distincts.** Chaque étape d'optimisation est mesurée sur les deux
+machines, pour répondre à une question que le barème ne pose pas mais qu'un ingénieur se pose :
+*le gain tient-il quand l'architecture change ?*
+
+| Banc | Rôle | Ce qu'on en tire |
+|---|---|---|
+| **A — MacBook Air M1** (ARM) | **référence** | Tous les chiffres cités dans ce rapport, sauf mention contraire explicite. |
+| **B — Intel Core Ultra 9 / WSL2** (x86) | contrôle | Uniquement le *ratio* de gain de chaque étape, comparé à celui du banc A. |
+
+Règle appliquée sans exception : **aucun tableau ne mélange les deux bancs**, et aucune valeur
+absolue du banc B n'est citée comme résultat. Comparer 2,1 s sur M1 à 0,8 s sur x86 n'apprend rien ;
+comparer un gain de ×4,1 à un gain de ×3,8 apprend que l'optimisation est portable.
+
+#### Banc A — référence
+
+> Valeurs issues d'un relevé `make env` antérieur, **à confirmer** par la première campagne
+> officielle.
 
 | Élément                   | Valeur                                                        |
 |---------------------------|---------------------------------------------------------------|
@@ -59,12 +72,44 @@ Source : `results/<run>/env.md`, généré par `make env`.
    turbo. C'est le warmup Hyperfine et le coefficient de variation qui attestent de la stabilité,
    pas un réglage système.
 
+#### Banc B — contrôle de portabilité
+
+| Élément                   | Valeur                                                                                             |
+|---------------------------|----------------------------------------------------------------------------------------------------|
+| CPU (modèle)              | Intel Core Ultra 9 275HX (Arrow Lake-HX), base 2,7 GHz                                             |
+| Cœurs physiques / threads | 24 / 24 — **pas de SMT** : 1 thread par cœur                                                       |
+| L1d / L1i (par cœur)      | 48 Kio / 64 Kio                                                                                    |
+| L2                        | 3 Mio privés par cœur — **40 Mio au total** côté hôte                                              |
+| L3                        | 36 Mio partagés par les 24 cœurs                                                                   |
+| Ligne de cache            | 64 o                                                                                               |
+| RAM                       | 64 Gio DDR5-6400 — **31 Gio visibles depuis WSL2**                                                 |
+| OS / noyau                | Windows 11 Famille 10.0.26200 → **WSL2** Ubuntu 26.04 LTS, noyau 6.6.114.1-microsoft-standard-WSL2 |
+| Runtime                   | go1.27.1 linux/amd64, `GOAMD64=v1`, `CGO_ENABLED=0`, `GOGC=100`, `GOMAXPROCS=24`                   |
+| SIMD disponibles          | sse4_2, avx, avx2 (pas d'AVX-512 sur Arrow Lake)                                                   |
+
+Source : `results/env-2026-09-22.md`. Trois réserves, qui expliquent pourquoi ce banc ne fournit que
+des ratios :
+
+1. **Virtualisation Hyper-V.** Les mesures tournent dans WSL2, pas sur le métal. Le coût est
+   constant entre les versions comparées — les ratios restent valides, les valeurs absolues sont
+   minorées.
+2. **Topologie hybride masquée.** L'Arrow Lake-HX mêle P-cores et E-cores, mais WSL2 présente 24
+   cœurs homogènes (`lscpu` annonce même 72 Mio de L2, contre 40 Mio relevés côté hôte). Même
+   conséquence qu'au banc A pour le §3.2, en pire : on ne sait même pas où sont les P-cores.
+3. **Fréquence non verrouillée**, ni gouverneur ni turbo pilotables depuis WSL2.
+
 ### 1.2 Protocole de mesure
 
 - Outil : Hyperfine `-N --warmup 3 --runs 15`, binaire exécuté sans shell intermédiaire.
 - Justification du warmup : cache disque du binaire, caches CPU, stabilisation de la fréquence.
 - Charge de travail : carte 1024×1024, graine 42, 64 foyers, `TURNS` tours. **Identique pour toutes
-  les versions.**
+  les versions et pour les deux bancs** — elle est dimensionnée pour la plus petite des deux
+  machines (8 Gio sur le banc A), ce qui exclut de promouvoir en charge officielle une carte au-delà
+  de 4096².
+- Une campagne = `make bench BANC=<nom>`, qui écrit dans `results/<commit>/<banc>/`. Le même commit
+  mesuré sur les deux machines donne deux dossiers frères. Le pipeline **refuse de mesurer sur un
+  arbre de travail modifié** : un dossier de résultats doit toujours correspondre exactement au code
+  du commit qu'il nomme.
 - Isolation du bruit : navigateur/IDE fermés, machine sur secteur, charge système vérifiée avant
   chaque campagne (voir `env.md`), [pinning si utilisé].
 - Micro-benchmarks : `go test -bench -benchmem -count 10`, comparés avec benchstat (intervalle de
@@ -151,7 +196,11 @@ Une entrée par étape, toujours au même format :
 > - **Hypothèse d'impact matériel :** …
 > - **Modification :** …
 > - **Commande de vérification :** `…`
-> - **Résultat :** avant → après (benchstat, avec p-value) ; allocs/op avant → après.
+> - **Résultat (banc A, référence) :** avant → après (benchstat, avec p-value) ; allocs/op avant → après.
+> - **Résultat (banc B, contrôle) :** le gain seul, en ratio.
+> - **Portabilité :** l'écart entre les deux gains, et son explication. Un gain qui s'effondre d'un
+>   banc à l'autre désigne une propriété matérielle précise — taille de cache, ligne de 64 contre
+>   128 octets, nombre de cœurs réels, jeu d'instructions.
 > - **Explication physique :** …
 
 Chaque étape est un **package distinct**, enregistré dans le registre de `internal/fire` et ajouté à
@@ -259,8 +308,18 @@ Coller `results/<run>/benchstat.txt` (benchstat `-col /impl`) et le tableau Hype
 | liste des cases actives | | | | |
 | … | | | | |
 
-Conclure en ordres de grandeur, sur la limite atteinte (calcul ou bande passante mémoire ?), et sur
-le fait qu'aucune version n'est la meilleure dans les deux régimes.
+**Portabilité des gains** — la seule table qui met les deux bancs en regard, et uniquement en ratios :
+
+| Version | Gain cumulé — banc A (M1, ARM) | Gain cumulé — banc B (x86) | Écart, et pourquoi |
+|---|---|---|---|
+| flat + double tampon | | | |
+| bitpack | | | |
+| liste des cases actives | | | |
+| parallel | | | |
+
+Conclure en ordres de grandeur, sur la limite atteinte (calcul ou bande passante mémoire ?), sur le
+fait qu'aucune version n'est la meilleure dans les deux régimes, et sur les gains qui ne survivent
+pas au changement d'architecture — ce sont eux qui en disent le plus sur le matériel.
 
 ---
 
