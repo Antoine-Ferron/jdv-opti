@@ -1,0 +1,34 @@
+// Schéma Protobuf du snapshot — deuxième format de l'axe I/O.
+//
+// Il corrige les deux défauts les plus coûteux du format JSON :
+//   [S1] plus de nom de champ répété par case — le wire format n'écrit que des
+//        numéros de champ ;
+//   [S3] plus d'encodage texte — les entiers sont en varint.
+//
+// Il en conserve un, volontairement, pour que la comparaison avec le format
+// bit-packé reste parlante :
+//   [S2] le décor (terrain, vent) est toujours réécrit à chaque snapshot.
+//
+// Les quatre grilles sont des champs `repeated uint32` marqués [packed = true] :
+// sans cela, Protobuf réécrirait l'étiquette du champ devant chaque valeur.
+// Régénérer avec : make proto
+
+syntax = "proto3";
+
+package wildfire.snapshot.v1;
+
+option go_package = "gol-wildfire/internal/snapshot/pb";
+
+message Snapshot {
+  uint32 turn = 1;
+  uint32 width = 2;
+  uint32 height = 3;
+
+  // Grilles en ordre ligne par ligne : index = y * width + x.
+  // Chaque valeur tient sur 2 bits, mais le plus petit varint fait un octet :
+  // c'est précisément la limite que le format bit-packé lèvera.
+  repeated uint32 terrain = 4 [packed = true];
+  repeated uint32 wind = 5 [packed = true];
+  repeated uint32 fire = 6 [packed = true];
+  repeated uint32 rest = 7 [packed = true];
+}
