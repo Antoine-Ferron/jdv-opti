@@ -37,7 +37,7 @@ comparer un gain de ×4,1 à un gain de ×3,8 apprend que l'optimisation est por
 
 #### Banc A — référence
 
-Source du relevé M1 : [env.md](../results/a47848f/m1-air/env.md), campagne du 23 septembre 2026.
+Source du relevé M1 : [env.md](../results/dcc3622/m1-air/env.md), campagne du 23 septembre 2026.
 Les valeurs de cache sont celles exposées par sysctl, sans description exhaustive de la topologie.
 
 | Élément                   | Valeur                                                        |
@@ -52,7 +52,7 @@ Les valeurs de cache sont celles exposées par sysctl, sans description exhausti
 | OS                        | macOS 15.5 (build 24F74)                                      |
 | Runtime                   | Go 1.27.1, darwin/arm64, CGO_ENABLED=1, GOGC=100 ; variable GOMAXPROCS non définie |
 | SIMD disponibles          | NEON 128 bits (pas d'AVX : architecture ARM)                  |
-| Alimentation              | Sur batterie, mode économie d’énergie désactivé (déclaré par Cherif) |
+| Alimentation              | **Sur secteur**, mode économie d’énergie désactivé (déclaré par Cherif) |
 
 **Quatre réserves à porter au crédit de la métrologie, pas à sa charge :**
 
@@ -68,9 +68,11 @@ Les valeurs de cache sont celles exposées par sysctl, sans description exhausti
 3. **`perf` n'existe pas sur macOS.** Pas de compteur matériel `cache-misses` en ligne de commande.
    Les preuves du §2 reposent donc sur pprof (CPU et allocations) et, si un compteur matériel
    devient nécessaire, sur Instruments. À dire explicitement plutôt qu'à passer sous silence.
-4. **Fréquence non verrouillée.** Apple Silicon ne laisse ni piloter le gouverneur ni figer le
-   turbo. C'est le warmup Hyperfine et le coefficient de variation qui attestent de la stabilité,
-   pas un réglage système.
+4. **Fréquence non verrouillée, et châssis sans ventilateur.** Apple Silicon ne laisse ni piloter le
+   gouverneur ni figer le turbo, et le MacBook Air est refroidi passivement. Sur une charge de ~6,4 s
+   répétée dix-huit fois, la machine chauffe et se bride de façon irrégulière : **le CV du banc A est
+   de 3,1 %, contre 0,7 % sur le banc B** (§1.3). C'est la réserve la plus gênante de ce banc,
+   puisque c'est lui qui fait foi — voir le §1.2 pour ce qu'on en déduit.
 
 #### Banc B — contrôle de portabilité
 
@@ -87,8 +89,8 @@ Les valeurs de cache sont celles exposées par sysctl, sans description exhausti
 | Runtime                   | go1.27.1 linux/amd64, `GOAMD64=v1`, `CGO_ENABLED=0`, `GOGC=100`, `GOMAXPROCS=24`                   |
 | SIMD disponibles          | sse4_2, avx, avx2 (pas d'AVX-512 sur Arrow Lake)                                                   |
 
-Source : `results/env-2026-09-22.md`. Trois réserves, qui expliquent pourquoi ce banc ne fournit que
-des ratios :
+Source : [env.md](../results/dcc3622/x86-controle/env.md). Trois réserves, qui expliquent pourquoi ce
+banc ne fournit que des ratios :
 
 1. **Virtualisation Hyper-V.** Les mesures tournent dans WSL2, pas sur le métal. Le coût est
    constant entre les versions comparées — les ratios restent valides, les valeurs absolues sont
@@ -114,15 +116,24 @@ des ratios :
 - Le pipeline **refuse de mesurer sur un arbre de travail modifié** : un dossier de résultats doit
   toujours correspondre exactement au code qu'il nomme.
 
-> Les deux campagnes de référence ci-dessous ont été produites avant cette règle et portent donc des
-> commits différents — `a47848f` pour le banc B, `3617efa` pour le banc A. Leur code mesuré est
-> **identique**, ce que vérifie `git diff a47848f 3617efa -- internal cmd go.mod Makefile scripts`,
-> qui ne renvoie rien. Elles sont donc comparables ; les campagnes suivantes partageront un dossier.
-- Isolation du bruit : navigateur/IDE fermés, charge système vérifiée avant chaque campagne (voir
-  `env.md`), [pinning si utilisé]. **L'alimentation est relevée banc par banc au §1.1** : la
-  campagne M1 a été faite *sur batterie*, ce qui reste une source de variabilité — Hyperfine y
-  signale d'ailleurs des valeurs atypiques (§1.3). À refaire sur secteur avant la première
-  comparaison de gain.
+> Les deux campagnes de référence ci-dessous partagent le dossier `results/dcc3622/`, mesuré sur les
+> deux bancs le même jour : `m1-air` et `x86-controle`.
+- Isolation du bruit : navigateur/IDE fermés, machine sur secteur, charge système vérifiée avant
+  chaque campagne (voir `env.md`), [pinning si utilisé].
+
+**La dispersion du banc de référence est sa faiblesse, et passer sur secteur ne l'a pas corrigée.**
+Une première campagne M1 sur batterie donnait un CV de 1,7 % ; la même sur secteur donne **3,1 %**,
+au-dessus du seuil de 2 % qu'on s'était fixé — le refroidissement passif du MacBook Air le bride
+d'autant plus qu'il monte plus haut en fréquence (§1.1, réserve 4). Ce qu'on en tire :
+
+- une moyenne sur 15 exécutions a une erreur standard de 3,1 % / √15 ≈ **0,8 %**, ce qui reste très
+  inférieur aux gains attendus (plusieurs dizaines de pour cent) : les comparaisons d'étapes restent
+  exploitables ;
+- en revanche, **aucun écart inférieur à ~3 % ne sera déclaré significatif sur ce banc**, et les
+  micro-benchmarks `go test -count 10` comparés par benchstat, qui donnent une p-value, primeront sur
+  la ligne Hyperfine pour trancher les cas serrés ;
+- piste d'amélioration si un cas serré se présente : augmenter `RUNS`, ou intercaler un temps de
+  repos entre les exécutions (`hyperfine --prepare 'sleep 2'`) pour laisser le châssis refroidir.
 - Micro-benchmarks : `go test -bench -benchmem -count 10`, comparés avec benchstat (intervalle de
   confiance, test de significativité).
 
@@ -158,31 +169,37 @@ de ce que fait le programme.
 
 #### Banc A — référence
 
-Campagne sur le commit `a47848f`, carte 1024², 64 foyers, 500 tours demandés,
-avec 3 échauffements puis 15 exécutions Hyperfine.
-Source : [statistiques](../results/a47848f/m1-air/hyperfine-stats.md).
+Campagne sur le commit `dcc3622`, **machine sur secteur**, carte 1024², 64 foyers, 500 tours
+demandés, avec 3 échauffements puis 15 exécutions Hyperfine.
+Source : [statistiques](../results/dcc3622/m1-air/hyperfine-stats.md).
 
 | Moyenne | Médiane | Écart-type | Variance | CV | Min | Max |
 |---|---|---|---|---|---|---|
-| 6,3767 s | 6,4332 s | 0,1068 s | 0,01140 s² | 1,7 % | 6,1536 s | 6,4617 s |
+| 6,4229 s | 6,4606 s | 0,1968 s | 0,03872 s² | **3,1 %** | 6,1872 s | 6,9199 s |
 
-La dispersion relative est inférieure à 2 %, mais Hyperfine signale des valeurs
-atypiques : ce seuil ne suffit pas à garantir l'absence de perturbations.
-Le temps inclut le démarrage du processus et la génération de carte.
-Les micro-benchmarks Run restent fixés à 50 tours dans cette version ; leurs
-temps ne sont pas directement comparables à cette mesure globale à 500 tours.
+La dispersion dépasse le seuil de 2 %, et le passage sur secteur l'a **aggravée** : une première
+campagne sur batterie, [conservée pour comparaison](../results/a47848f/m1-air/hyperfine-stats.md),
+donnait 1,7 % (6,3767 s de moyenne). L'explication la plus probable est le refroidissement passif du
+châssis (§1.1, réserve 4), qui bride la machine d'autant plus qu'elle monte plus haut en fréquence.
+Le §1.2 précise ce qu'on en déduit : les comparaisons d'étapes restent exploitables, mais aucun écart
+inférieur à ~3 % ne sera déclaré significatif sur cette seule ligne.
+
+Le temps inclut le démarrage du processus et la génération de carte. Les micro-benchmarks `Run`
+restent fixés à 50 tours ; leurs temps ne sont pas directement comparables à cette mesure globale.
 
 #### Banc B — contrôle
 
-Campagne de référence, commit `a47848f`, carte 1024², 64 foyers, 500 tours, Hyperfine `-N --warmup 3
---runs 15` (`results/a47848f/x86-controle/`) :
+Campagne de référence, commit `dcc3622`, carte 1024², 64 foyers, 500 tours, Hyperfine `-N --warmup 3
+--runs 15` (`results/dcc3622/x86-controle/`) :
 
 | Moyenne | Médiane | Écart-type | Variance | CV | Min | Max |
 |---|---|---|---|---|---|---|
-| 8,2574 s | 8,2408 s | 0,0893 s | 7,976 × 10⁻³ s² | **1,1 %** | 8,1320 s | 8,5106 s |
+| 8,4021 s | 8,4104 s | 0,0611 s | 3,729 × 10⁻³ s² | **0,7 %** | 8,2926 s | 8,4825 s |
 
-Coefficient de variation à 1,1 %, sous le seuil de 2 % : la mesure est stable malgré une fréquence
-non verrouillée et la virtualisation WSL2 — c'est le warmup et le nombre de runs qui l'assurent.
+Coefficient de variation à 0,7 %, bien sous le seuil de 2 % : la mesure est stable malgré une
+fréquence non verrouillée et la virtualisation WSL2 — c'est le warmup et le nombre de runs qui
+l'assurent. Fait notable : **le banc de contrôle est quatre fois plus stable que le banc de
+référence**, dont le châssis se bride (§1.1, réserve 4).
 Ces valeurs absolues ne sont pas des résultats du rapport ; seuls les ratios de gain mesurés sur ce
 banc seront cités, en regard de ceux du banc A.
 
@@ -200,57 +217,61 @@ banc seront cités, en regard de ceux du banc A.
 ### 2.1 Profil CPU de la baseline
 
 ![Flamegraph CPU baseline sur M1](figures/m1-air/flame-cpu-naive.png)
-
 *Figure 1 — **Banc A** (Apple M1, macOS), celui qui fait foi. `naive`, carte 1024², graine 42,
-64 foyers, 500 tours, commit `a47848f`. Profil : `results/a47848f/m1-air/profiles/naive-cpu.prof`,
-4,83 s d'échantillons sur 5,75 s. Le calcul dans Step domine le CPU ; les calculs d'indices toriques
-Map.At → Mod et le comptage Burning sont également visibles.*
+64 foyers, 500 tours, commit `dcc3622`, machine sur secteur. Profil :
+`results/dcc3622/m1-air/profiles/naive-cpu.prof`, 5,34 s d'échantillons sur 6,16 s. Le calcul dans
+Step domine le CPU ; les indices toriques Map.At → Mod, le comptage Burning et `runtime.madvise` —
+le retour de mémoire au système — sont également visibles.*  
+Sources : [profil CPU](../results/dcc3622/m1-air/profiles/naive-cpu-top.txt)
+et [détail par ligne](../results/dcc3622/m1-air/profiles/naive-cpu-list.txt).
 
-Sources : [profil CPU](../results/a47848f/m1-air/profiles/naive-cpu-top.txt)
-et [détail par ligne](../results/a47848f/m1-air/profiles/naive-cpu-list.txt).
-
-Chiffres correspondants :
+Chiffres correspondants :  
 
 | Fonction | Part directe (flat) | Part appels inclus (cum) |
-|---|---:|---:|
-| Step | 71,64 % | 90,48 % |
-| Map.At | 3,11 % | 11,80 % |
-| Mod | 7,87 % | 8,07 % |
-| Burning | 5,80 % | 6,42 % |
+|----------|--------------------:|-------------------------:|
+| Step     |             73,78 % |                  87,45 % |
+| Burning  |              6,74 % |                   6,74 % |
+| `runtime.madvise` |     5,43 % |                   5,43 % |
+| Mod      |              5,24 % |                   5,24 % |
+| Terrain.Combustion |    2,62 % |                   2,62 % |
+| Map.At   |              2,43 % |                   7,30 % |
 
-Le profil couvre 5,75 s, avec 4,83 s d'échantillons CPU. Les pourcentages
+Le profil couvre 6,16 s, avec 5,34 s d'échantillons CPU. Les pourcentages
 portent sur ces échantillons, pas sur le temps Hyperfine. Les coûts cumulés
 s'incluent : Map.At et Mod sont notamment compris dans Step et ne doivent pas
-être ajoutés à ses 90,48 %. Le profil CPU commence après la génération de carte.
+être ajoutés à ses 87,45 %. Le profil CPU commence après la génération de carte.
 Fingerprint n'est pas appelé par fire.Run et n'apparaît donc pas dans ce profil.
+
+Deux observations propres à ce banc. **`Burning` y coûte plus cher que `Mod`** — 6,74 % contre
+5,24 % : recompter toute la carte à chaque appel pèse davantage, ici, que l'enroulement torique.
+Et `runtime.madvise`, à 5,43 %, est la trace des tampons jetés à chaque tour : le noyau rend la
+mémoire au système puis la redemande. C'est un coût CPU imputable aux allocations, que le seul
+`gcBgMarkWorker` du profil x86 ne laissait pas voir.
 
 #### Observation complémentaire — banc B (x86, hors référence M1)
 
 ![Flamegraph CPU baseline sur x86](figures/x86-controle/flame-cpu-naive.png)
-
 *Figure 3 — **Banc B** (Intel Core Ultra 9 275HX, WSL2), contrôle de portabilité. Même code et même
 charge que la figure 1. Profil : `results/dcc3622/x86-controle/profiles/naive-cpu.prof`, 7,94 s
 d'échantillons sur 7,71 s. Deux zones à lire :*
-
 - *le large bloc central `fire.Map.At → fire.Mod`, directement sous Step : **3,31 s, soit 42 % du
   CPU** — c'est `naive.go:104`, deux divisions entières par voisin et huit voisins par case en feu ;*
 - *la pile de droite `fire.Map.WindAt → fire.Map.At → fire.Mod` : **0,82 s, 10 % du CPU**, alors
   qu'1 % seulement des cases portent du vent — c'est `naive.go:97`, où WindAt refait lui-même un
   Map.At pour découvrir presque toujours qu'il n'y a pas de vent.*
 
-*Ni l'une ni l'autre n'a d'équivalent sur la figure 1 : Mod y pèse 7,9 % contre 41,1 % ici.*
+*Ni l'une ni l'autre n'a d'équivalent sur la figure 1 : Mod y pèse 5,2 % contre 41,1 % ici.*  
+Source : [profil CPU x86](../results/dcc3622/x86-controle/profiles/naive-cpu-top.txt).
+Ce profil couvre 7,71 s et totalise 7,94 s d'échantillons CPU.
 
-Source : [profil CPU x86](../results/a47848f/x86-controle/profiles/naive-cpu-top.txt).
-Ce profil couvre 7,50 s et totalise 7,66 s d'échantillons CPU.
-
-| Fonction | CPU direct | CPU cumulé |
-|---|---:|---:|
-| Step | 49,74 % | 94,78 % |
-| Mod | 36,29 % | 36,29 % |
-| Map.At | 3,52 % | 39,69 % |
-| Map.WindAt | 4,18 % | 10,31 % |
-| Burning | 2,74 % | 2,74 % |
-| runtime.gcBgMarkWorker | 0 % | 2,35 % |
+| Fonction               | CPU direct | CPU cumulé |
+|------------------------|-----------:|-----------:|
+| Step                   |    46,22 % |    94,84 % |
+| Mod                    |    41,06 % |    41,18 % |
+| Map.At                 |     2,52 % |    43,70 % |
+| Map.WindAt             |     3,78 % |    10,33 % |
+| Burning                |     2,27 % |     2,27 % |
+| runtime.gcBgMarkWorker |        0 % |     2,35 % |
 
 Le modulo apparaît proportionnellement plus coûteux sur ce profil x86 que sur
 M1. Cette observation motive une vérification de portabilité, sans établir
@@ -263,19 +284,19 @@ Fingerprint est absent des deux profils car fire.Run ne l'appelle pas.
 
 ![Flamegraph allocations baseline sur M1](figures/m1-air/flame-alloc-naive.png)
 
-*Figure 2 — **Banc A** (Apple M1, macOS). Même exécution que la figure 1, commit `a47848f`. Profil :
-`results/a47848f/m1-air/profiles/naive-mem.prof`, échantillonné à `MemProfileRate = 4096` octets.
+*Figure 2 — **Banc A** (Apple M1, macOS). Même exécution que la figure 1, commit `dcc3622`. Profil :
+`results/dcc3622/m1-air/profiles/naive-mem.prof`, échantillonné à `MemProfileRate = 4096` octets.
 Sur cette exécution, le tampon d'allumage créé par Step domine les allocations ; la génération
 initiale de la carte contribue également au volume total.*
 
-Source : [profil alloc_space](../results/a47848f/m1-air/profiles/naive-mem-top.txt).
+Source : [profil alloc_space](../results/dcc3622/m1-air/profiles/naive-mem-top.txt).
 Le volume cumulé estimé est de 595,28 MB dans les unités affichées par pprof :
 Step représente 82,15 % et Generate, appels inclus, 17,33 %.
 Il ne s'agit ni du pic de mémoire ni de la mémoire conservée en fin d'exécution.
 Contrairement au profil CPU, le profil cumulatif d'allocations inclut la génération
 initiale. Les estimations échantillonnées ne remplacent pas les mesures par opération.
 
-Les [micro-benchmarks](../results/a47848f/m1-air/benchstat.txt) mesurent
+Les [micro-benchmarks](../results/dcc3622/m1-air/benchstat.txt) mesurent
 1 allocation de 1 Mio par Step à 1024². Le benchmark isolé de Fingerprint
 mesure environ 451 200 allocations et 16,82 Mio par appel ; cette opération
 ne fait pas partie de l'exécution normale profilée ici.
@@ -289,7 +310,7 @@ Capture équivalente : `rapport/figures/x86-controle/flame-alloc-naive.png`. Ell
 ici : les proportions y sont les mêmes qu'à la figure 2, ce qui est attendu puisque les allocations
 sont une propriété du code et non de la machine.
 
-Source : [profil alloc_space x86](../results/a47848f/x86-controle/profiles/naive-mem-top.txt).
+Source : [profil alloc_space x86](../results/dcc3622/x86-controle/profiles/naive-mem-top.txt).
 Sur 596,32 MB estimés par pprof, Step représente 490 MB (82,17 %) et Generate,
 appels inclus, 103,14 MB (17,30 %). Ces estimations cumulées confirment la même
 origine dominante des allocations que sur M1 ; elles ne sont pas un comptage
@@ -305,18 +326,18 @@ partie du processus mesuré par Hyperfine.
 2. **Tampon d'allumage : 1 Mio alloué par tour en 1024².** Step construit un
    nouveau tableau booléen à chaque appel. Le réutiliser est une hypothèse
    mesurable de réduction des allocations, pas encore une preuve de gain CPU.
-3. **Burning : 6,42 % du CPU, appels inclus.** Le nombre de cases en feu est
-   recalculé par un balayage complet à chaque appel.
+3. **Burning : 6,74 % du CPU**, soit davantage que le modulo torique sur ce banc. Le nombre de cases
+   en feu est recalculé par un balayage complet à chaque appel.
 4. **Fingerprint : coût isolé, hors du chemin de fire.Run.** Sur le banc M1,
-   sa médiane est de 24,19 ms contre 9,820 ms pour Step dans le scénario
-   embrasement, soit environ 2,46 fois. Ces benchmarks utilisent des états et
+   sa médiane est de 24,05 ms contre 10,03 ms pour Step dans le scénario
+   embrasement, soit environ 2,40 fois. Ces benchmarks utilisent des états et
    protocoles différents (empreinte sur état fixe, Step sur état évolutif) :
    ce ratio n'est pas une part du temps de simulation. Le formatage des coordonnées
    explique ses nombreuses allocations, mais son optimisation seule n'accélérera
    pas fire.Run tant que celui-ci ne l'appelle pas.
 
-Sources des micro-mesures : [benchstat](../results/a47848f/m1-air/benchstat.txt)
-et [résultats bruts](../results/a47848f/m1-air/bench.txt). Les comptes d'allocations
+Sources des micro-mesures : [benchstat](../results/dcc3622/m1-air/benchstat.txt)
+et [résultats bruts](../results/dcc3622/m1-air/bench.txt). Les comptes d'allocations
 sont ceux mesurés sur M1 ; leur égalité sur un autre environnement doit être vérifiée.
 
 #### Le même filtre sur les deux bancs
@@ -327,13 +348,14 @@ d'image, et le champ reste visible dans la capture — n'importe qui peut la rep
 
 ![Filtre Mod sur le profil M1](figures/m1-air/flame-cpu-mod-naive.png)
 
-*Figure 4 — **Banc A** (M1). Le cadre `fire.Mod` encadré occupe environ 7 % de la largeur du
-graphe ; `Burning` et `Terrain.Combustion`, à sa droite, pèsent ici un poids comparable.*
+*Figure 4 — **Banc A** (M1). Le cadre `fire.Mod` encadré occupe environ 5 % de la largeur du
+graphe ; `Burning`, à sa droite, est visiblement plus large — il coûte effectivement plus cher
+(6,74 % contre 5,24 %).*
 
 ![Filtre Mod sur le profil x86](figures/x86-controle/flame-cpu-mod-naive.png)
 
-*Figure 5 — **Banc B** (x86). Même filtre, même code, même charge : le cadre `fire.Mod` occupe
-environ 35 % de la largeur, cinq fois plus qu'à la figure 4.*
+*Figure 5 — **Banc B** (x86). Même filtre, même code, même charge, même commit : le cadre `fire.Mod`
+occupe environ 35 % de la largeur, soit sept fois plus qu'à la figure 4 (41,1 % du CPU contre 5,2 %).*
 
 **C'est le résultat central du diagnostic**, et il n'aurait pas été visible avec un seul banc : la
 division entière du modulo torique domine le profil x86 et reste marginale sur ARM. Une optimisation
@@ -343,7 +365,7 @@ d'instructions n'étant pas établi par ces seuls profils.
 
 #### Pistes de portabilité issues du diagnostic x86
 
-Le [profil par ligne x86](../results/a47848f/x86-controle/profiles/naive-cpu-list.txt)
+Le [profil par ligne x86](../results/dcc3622/x86-controle/profiles/naive-cpu-list.txt)
 met en évidence le calcul des cibles via Map.At, la lecture du vent via WindAt
 et le calcul du secteur amont. WindAt est interrogé pour chaque case en feu,
 même si elle ne porte pas de vent ; il recalcule des indices toriques.
@@ -359,10 +381,10 @@ Les pistes à comparer sur les deux bancs sont :
 - Empreinte sans formatage, pour ses usages propres ; elle n'accélère pas
   l'exécution actuelle de fire.Run.
 
-Les anciennes valeurs x86 de 12,19 ms et 20,62 ms ne décrivent pas la campagne
-courante a47848f : son [benchstat](../results/a47848f/x86-controle/benchstat.txt)
-rapporte respectivement 16,59 ms pour Step/embrasement/1024 et 20,12 ms pour
-Fingerprint/1024. Ces données restent un diagnostic du banc B, pas la référence M1.
+Pour mémoire, les valeurs correspondantes du banc B sur la campagne courante
+(son [benchstat](../results/dcc3622/x86-controle/benchstat.txt)) : 12,81 ms ± 1 %
+pour Step/embrasement/1024 et 20,60 ms ± 4 % pour Fingerprint/1024, soit un rapport
+de 1,61 contre 2,40 sur M1. Ces données restent un diagnostic du banc B, pas la référence.
 
 ### 2.4 Deux pièges de lecture, à écarter avant d'interpréter
 
@@ -379,12 +401,14 @@ retenu : **elles sont méthodologiques, à reproduire ici avant d'être citées 
    utile : une machine plus lente ne fait pas apparaître un gain qui n'existe pas — c'est la
    mesure normalisée (cycles par case) qui démasque une implémentation coûteuse, pas le chronomètre.
 
-**Dispersion sur le banc B.** La campagne a47848f présente notamment des
-intervalles relatifs de ±17 % pour Step/embrasement/1024 et ±14 % pour
-Run/front/1024 (source : benchstat x86 ci-dessus). Les allocations et le GC
-sont des hypothèses d'explication, mais une attribution causale exige des
-mesures complémentaires. Aucun seuil universel de gain de 20 % ne peut en
-être déduit : la significativité sera évaluée sur les échantillons comparés.
+**Dispersion, et elle n'est pas où on l'attendrait.** Sur la campagne `dcc3622`, les
+micro-benchmarks du banc B affichent ±12 % pour Run/front/512 et **±18 %** pour Run/front/1024,
+quand les mêmes mesures sur le banc A tiennent ±1 %. C'est l'inverse d'Hyperfine, où le banc A est
+le moins stable (CV 3,1 % contre 0,7 %) : les micro-benchmarks sont assez courts pour échapper au
+bridage thermique du MacBook Air, tandis que le scénario `front` a peu d'itérations et subit les
+allocations. Les allocations et le GC restent des hypothèses d'explication ; une attribution causale
+exigerait des mesures complémentaires. Aucun seuil universel de gain ne peut en être déduit : la
+significativité sera évaluée sur les échantillons comparés, banc par banc.
 
 ---
 

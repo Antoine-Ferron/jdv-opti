@@ -1,7 +1,0 @@
-ok  	gol-wildfire/cmd/web	0.638s
-?   	gol-wildfire/cmd/wildfire	[no test files]
-ok  	gol-wildfire/internal/bench	0.181s [no tests to run]
-?   	gol-wildfire/internal/engines	[no test files]
-ok  	gol-wildfire/internal/fire	0.356s
-?   	gol-wildfire/internal/firetest	[no test files]
-ok  	gol-wildfire/internal/naive	0.493s
