@@ -251,7 +251,7 @@ mémoire au système puis la redemande. C'est un coût CPU imputable aux allocat
 #### Observation complémentaire — banc B (x86, hors référence M1)
 
 ![Flamegraph CPU baseline sur x86](figures/x86-controle/flame-cpu-naive.png)
-*Figure 3 — **Banc B** (Intel Core Ultra 9 275HX, WSL2), contrôle de portabilité. Même code et même
+*Figure 2 — **Banc B** (Intel Core Ultra 9 275HX, WSL2), contrôle de portabilité. Même code et même
 charge que la figure 1. Profil : `results/dcc3622/x86-controle/profiles/naive-cpu.prof`, 7,94 s
 d'échantillons sur 7,71 s. Deux zones à lire :*
 - *le large bloc central `fire.Map.At → fire.Mod`, directement sous Step : **3,31 s, soit 42 % du
@@ -284,7 +284,7 @@ Fingerprint est absent des deux profils car fire.Run ne l'appelle pas.
 
 ![Flamegraph allocations baseline sur M1](figures/m1-air/flame-alloc-naive.png)
 
-*Figure 2 — **Banc A** (Apple M1, macOS). Même exécution que la figure 1, commit `dcc3622`. Profil :
+*Figure 3 — **Banc A** (Apple M1, macOS). Même exécution que la figure 1, commit `dcc3622`. Profil :
 `results/dcc3622/m1-air/profiles/naive-mem.prof`, échantillonné à `MemProfileRate = 4096` octets.
 Sur cette exécution, le tampon d'allumage créé par Step domine les allocations ; la génération
 initiale de la carte contribue également au volume total.*
@@ -307,7 +307,7 @@ pauses et du temps GC reste à effectuer ; elle ne se déduit pas du volume allo
 #### Observation complémentaire — allocations du banc B
 
 Capture équivalente : `rapport/figures/x86-controle/flame-alloc-naive.png`. Elle n'est pas reproduite
-ici : les proportions y sont les mêmes qu'à la figure 2, ce qui est attendu puisque les allocations
+ici : les proportions y sont les mêmes qu'à la figure 3, ce qui est attendu puisque les allocations
 sont une propriété du code et non de la machine.
 
 Source : [profil alloc_space x86](../results/dcc3622/x86-controle/profiles/naive-mem-top.txt).
@@ -342,7 +342,7 @@ sont ceux mesurés sur M1 ; leur égalité sur un autre environnement doit être
 
 #### Le même filtre sur les deux bancs
 
-Les deux captures suivantes sont les mêmes vues que les figures 1 et 3, avec `Mod` saisi dans le
+Les deux captures suivantes sont les mêmes vues que les figures 1 et 2, avec `Mod` saisi dans le
 champ *Search regexp* de pprof : l'outil encadre lui-même les cadres correspondants, sans retouche
 d'image, et le champ reste visible dans la capture — n'importe qui peut la reproduire.
 
