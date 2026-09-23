@@ -1,7 +1,7 @@
 # Points d'entrée du projet. Tout est reproductible en une commande : make bench
 IMPL  ?= naive
 SIZE  ?= 1024
-TURNS ?= 50
+TURNS ?= 500
 FIRES ?= 64
 ADDR  ?= 127.0.0.1:8081
 BANC  ?= $(shell uname -s)-$(shell uname -m)

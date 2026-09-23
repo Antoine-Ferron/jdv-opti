@@ -4,7 +4,7 @@
 #
 # Usage : ./scripts/run_benchmarks.sh            (ou : make bench)
 # Paramètres surchargeables par variables d'environnement :
-#   IMPLS="naive flat"  SIZE=1024  TURNS=50  WARMUP=3  RUNS=15  COUNT=10  BENCH=.
+#   IMPLS="naive flat"  SIZE=1024  TURNS=500  WARMUP=3  RUNS=15  COUNT=10  BENCH=.
 #   BANC=m1-air   nom du banc d'essai (défaut : <système>-<architecture>)
 #   FORCE=1       mesurer malgré un arbre de travail modifié (à éviter)
 #
@@ -15,7 +15,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 SIZE=${SIZE:-1024}
-TURNS=${TURNS:-50}
+TURNS=${TURNS:-500}
 WARMUP=${WARMUP:-3}
 RUNS=${RUNS:-15}
 COUNT=${COUNT:-10}

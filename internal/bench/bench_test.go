@@ -24,14 +24,17 @@ var sizes = []int{256, 1024, 2048}
 //	embrasement — beaucoup de foyers et une mise en régime préalable : la carte
 //	              est saturée, ce sont la localité mémoire et la bande passante
 //	              qui décident.
-var scenarios = []struct {
+type scenario struct {
 	nom     string
 	foyers  int
 	chauffe int
-}{
-	{"front", 1, 0},
-	{"embrasement", 64, 50},
 }
+
+// etabli est le seul régime où mesurer un Step isolé a un sens : la carte est
+// saturée, l'état ne dérive plus d'une itération à l'autre.
+var etabli = scenario{"embrasement", 64, 50}
+
+var scenarios = []scenario{{"front", 1, 0}, etabli}
 
 func carte(n, foyers int) fire.Map {
 	cfg := fire.DefaultConfig(n, n, 42)
@@ -46,27 +49,28 @@ func chauffe(e fire.Engine, tours int) fire.Engine {
 	return e
 }
 
-// BenchmarkStep mesure le coût d'un tour (le cœur du hot path).
+// BenchmarkStep mesure le coût d'un tour (le cœur du hot path), et uniquement
+// en régime établi.
 //
-// L'état dérive d'une itération à l'autre : l'incendie s'étend, puis atteint son
-// régime. La mesure reste comparable entre implémentations puisqu'elles partent toutes
-// de la même carte et de la même graine, mais elle n'est pas une moyenne sur un
-// régime stationnaire : c'est BenchmarkRun qui mesure un scénario borné.
+// Un Step isolé ne se mesure que sur un état stable : go test choisit lui-même
+// le nombre d'itérations, or en scénario front l'incendie s'étend pendant la
+// mesure, si bien que le coût par tour dépend de b.N. Mesuré ainsi, front
+// donnait ±33 % de variance à 2048² — inexploitable pour comparer deux
+// implémentations. Il est mesuré par BenchmarkRun, qui borne le travail par
+// itération.
 func BenchmarkStep(b *testing.B) {
 	for _, impl := range fire.Names() {
 		f, _ := fire.Get(impl)
-		for _, s := range scenarios {
-			for _, n := range sizes {
-				b.Run(fmt.Sprintf("impl=%s/scenario=%s/size=%d", impl, s.nom, n), func(b *testing.B) {
-					e := chauffe(f(carte(n, s.foyers)), s.chauffe)
-					b.ReportAllocs()
-					b.SetBytes(int64(n * n)) // débit exprimé en cases/s
-					b.ResetTimer()
-					for i := 0; i < b.N; i++ {
-						e.Step()
-					}
-				})
-			}
+		for _, n := range sizes {
+			b.Run(fmt.Sprintf("impl=%s/scenario=%s/size=%d", impl, etabli.nom, n), func(b *testing.B) {
+				e := chauffe(f(carte(n, etabli.foyers)), etabli.chauffe)
+				b.ReportAllocs()
+				b.SetBytes(int64(n * n)) // débit exprimé en cases/s
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					e.Step()
+				}
+			})
 		}
 	}
 }
@@ -88,19 +92,22 @@ func BenchmarkFingerprint(b *testing.B) {
 }
 
 // BenchmarkRun mesure un scénario complet et borné : construction du moteur
-// comprise, nombre de tours fixe, donc parfaitement reproductible.
+// comprise, nombre de tours fixe, donc parfaitement reproductible — c'est ici
+// que le scénario front est mesuré.
 func BenchmarkRun(b *testing.B) {
+	const tours = 50
 	for _, impl := range fire.Names() {
 		f, _ := fire.Get(impl)
-		n, tours := 512, 50
 		for _, s := range scenarios {
-			m := carte(n, s.foyers)
-			b.Run(fmt.Sprintf("impl=%s/scenario=%s/size=%d", impl, s.nom, n), func(b *testing.B) {
-				b.ReportAllocs()
-				for i := 0; i < b.N; i++ {
-					fire.Run(f(m), fire.Options{Turns: tours})
-				}
-			})
+			for _, n := range []int{512, 1024} {
+				m := carte(n, s.foyers)
+				b.Run(fmt.Sprintf("impl=%s/scenario=%s/size=%d", impl, s.nom, n), func(b *testing.B) {
+					b.ReportAllocs()
+					for i := 0; i < b.N; i++ {
+						fire.Run(f(m), fire.Options{Turns: tours})
+					}
+				})
+			}
 		}
 	}
 }

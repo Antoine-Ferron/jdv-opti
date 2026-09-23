@@ -115,15 +115,33 @@ des ratios :
 - Micro-benchmarks : `go test -bench -benchmem -count 10`, comparés avec benchstat (intervalle de
   confiance, test de significativité).
 
-**Deux périmètres de mesure, à ne pas confondre — et c'est un piège vérifié.** La carte est
-engendrée par `fire.Generate` **avant** la boucle de tours : les micro-benchmarks l'excluent de
-leur chronomètre, mais Hyperfine mesure le processus entier, génération comprise. Sur une charge
-trop courte, la génération domine le temps total et **écrase le gain à mesurer** : une optimisation
-qui diviserait `Step` par deux n'apparaîtrait que comme quelques pour cent sur la ligne Hyperfine.
+**Un Step isolé ne se mesure qu'en régime établi.** `go test` choisit lui-même son nombre
+d'itérations ; or en scénario `front` l'incendie s'étend pendant la mesure, donc le coût moyen d'un
+tour dépend de ce nombre. Première campagne à l'appui : `Step/front/size=2048` donnait **±33 %** de
+variance, inexploitable pour comparer deux implémentations, quand `Run` — qui borne le travail par
+itération — tenait ±2 %. `BenchmarkStep` ne mesure donc que le régime saturé, et le scénario `front`
+est mesuré par `BenchmarkRun`.
 
-*À chiffrer sur le banc retenu, puis à fixer* : le nombre de tours de la charge Hyperfine est choisi
-pour que la simulation représente l'essentiel du temps mesuré. Donner ici les deux durées mesurées
-(génération seule, simulation seule) et le `TURNS` qui en découle.
+**Deux périmètres de mesure, à ne pas confondre — et c'est ce qui a fixé la charge.** La carte est
+engendrée par `fire.Generate` **avant** la boucle de tours : les micro-benchmarks l'excluent de leur
+chronomètre, mais Hyperfine mesure le processus entier, génération comprise. Sur une charge trop
+courte, la génération domine le temps total et **écrase le gain à mesurer**.
+
+Mesuré sur le banc B, carte 1024², 64 foyers :
+
+| Charge | Temps total | Dont simulation | Part de la génération |
+|---|---|---|---|
+| 50 tours | 0,84 s | 0,178 s | **79 %** |
+| **500 tours** | 8,15 s | 7,49 s | **8 %** |
+
+À 50 tours, une optimisation qui diviserait `Step` par deux n'aurait apparu que comme ~10 % sur la
+ligne Hyperfine. **La charge est donc fixée à 500 tours**, ce qui ramène la génération sous 10 % du
+temps mesuré.
+
+Second argument, indépendant : le débit passe de 2,9 × 10⁸ à 7,0 × 10⁷ cases/s entre 50 et 500
+tours. À 50 tours l'incendie n'a pas fini de s'étendre — on mesure un transitoire ; à 500 tours il
+a atteint le régime entretenu décrit dans `REGLES.md` §4. Seule la seconde mesure est représentative
+de ce que fait le programme.
 
 ### 1.3 Mesures de référence
 
