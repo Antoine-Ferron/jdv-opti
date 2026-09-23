@@ -1,0 +1,12 @@
+# Fins de ligne en LF partout, dans le dépôt comme dans les copies de travail.
+#
+# Sans cela, un poste Windows (core.autocrlf=true) récupère des CRLF : les
+# scripts du pipeline de mesure deviennent inexécutables sous WSL
+# («syntax error near unexpected token $'in\r'») et gofmt rejette tous les
+# fichiers Go. L'équipe travaillant sur macOS et Windows, la règle est imposée
+# ici plutôt que laissée à la configuration de chacun.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.pdf binary
