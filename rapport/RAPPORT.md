@@ -445,6 +445,101 @@ Chaque étape est un **package distinct**, enregistré dans le registre de `inte
 `internal/engines` : la suite de conformité `internal/firetest` la rejoue automatiquement, et une
 version qui casse une règle est rejetée avant d'être mesurée.
 
+### Étape 1 — `flat` : stockage contigu et tampons réutilisés
+
+**Nature : mixte, selon les définitions du cours.** Macro : remplacement de
+`[][]Cell` par deux grilles contiguës `[]Cell`, modification de la structure des
+données. Micro : suppression du tampon d'allumage temporaire, désormais alloué
+une fois et réinitialisé avec `clear` à chaque tour.
+
+**Hypothèse :** passer de 1 allocation de 1 Mio par Step à 0 allocation et
+0 octet par tour sur 1024². Cette hypothèse porte sur les allocations ;
+le gain CPU éventuel doit être établi séparément.
+
+**Implémentation :** la propagation lit la grille courante et marque un tampon
+`[]bool`. Les transitions écrivent toutes les cellules dans la seconde grille,
+puis les deux grilles sont échangées. Réécrire chaque cellule et remettre les
+marques à zéro évite les états périmés. Le double tampon suit le plan convenu,
+mais n'est pas indispensable à la synchronisation de cette baseline déjà en
+deux phases ; son coût en mémoire et en écritures doit donc être évalué.
+
+**Complexité :** O(N) par Step et O(N) en mémoire avant et après, N étant le
+nombre de cases et le nombre de voisins étant borné. Burning reste un balayage
+O(N). Avec Cell de 2 octets, les deux grilles et le tampon représentent 5N octets
+de données persistantes (5 Mio en 1024²), hors carte et en-têtes. Ce changement
+réduit le volume alloué par tour, pas nécessairement la mémoire résidente.
+
+**Périmètre contrôlé :** règles, modulos, lecture du vent, recomptage Burning
+et formatage/SHA-256 de Fingerprint sont conservés. Le maintien du formatage et
+des modulos est une exception expérimentale aux interdits de constitution.md
+pour isoler cette étape. New et Fingerprint allouent toujours.
+La baseline naive et la référence firetest restent intactes.
+
+**Validation réalisée :** `go test ./... -count=1` passe. La suite commune est
+complétée par une comparaison cellule par cellule et des empreintes sur 100 tours
+avec vent et dimensions impaires, un test d'extinction sans contagion résiduelle,
+et un test `AllocsPerRun` qui vérifie zéro allocation par Step sur 67 × 45.
+L'analyse `go build -gcflags=-m ./internal/flat` documente les allocations du
+constructeur et de l'empreinte ; Step ne contient pas d'allocation de tampon.
+
+**Commande de campagne exécutée sur le banc M1, commit de code `1d3a093` :**
+
+```bash
+make bench BANC=m1-air
+```
+
+Cette campagne intègre les ajouts de snapshots après fusion de main. Les
+benchmarks de snapshots constituent une série I/O distincte, sans clé `impl` :
+leur colonne non nommée dans benchstat ne représente pas un troisième moteur.
+Les moyennes géométriques de séries différentes ne servent pas à conclure sur flat.
+
+**Résultats banc A — Apple M1.** Sources :
+[benchstat](../results/1d3a093/m1-air/benchstat.txt),
+[mesures brutes](../results/1d3a093/m1-air/bench.txt) et
+[tests](../results/1d3a093/m1-air/tests.txt).
+
+| Mesure | naive | flat | Conclusion |
+|---|---:|---:|---|
+| Allocations par Step, 1024² | 1 | 0 | Objectif atteint |
+| Octets alloués par Step, 1024² | 1 Mio | 0 | Tampon temporaire supprimé |
+| Temps médian Step/embrasement, 1024² | 9,962 ms | 9,932 ms | Pas de différence significative, p = 0,218 |
+| Temps médian Step/embrasement, 2048² | 23,67 ms | 23,89 ms | flat environ 0,9 % plus lent, p = 0,019 |
+
+Sur BenchmarkRun en 1024², le volume cumulé alloué passe de 52,03 Mio à
+5 Mio, soit environ 90,4 % de réduction ; les allocations passent de 1 076
+à 4 par exécution, construction du moteur comprise. Il ne s'agit pas du pic de
+mémoire occupée. Step n'alloue plus pour les trois tailles testées.
+
+Les résultats CPU sont mixtes : Step en 256² et Run/front en 512² s'améliorent,
+mais Run/front en 1024² et Fingerprint présentent de petites régressions
+significatives. Run/embrasement ne montre pas de différence significative,
+ni en 512² (p = 0,912), ni en 1024² (p = 0,165).
+Benchstat prend flat comme référence : un pourcentage négatif dans la colonne
+naive indique que naive est plus rapide. Les p-values affichées `0.000` sont
+arrondies, pas nulles.
+
+**Temps global — 500 tours demandés.** Source :
+[statistiques Hyperfine](../results/1d3a093/m1-air/hyperfine-stats.md).
+
+| Moteur | Temps moyen | Écart-type | CV |
+|---|---:|---:|---:|
+| naive | 6,4270 s | 0,1623 s | 2,5 % |
+| flat | 6,3312 s | 0,0302 s | 0,5 % |
+
+La diminution observée de la moyenne est d'environ 1,5 %. Ce rapport de
+moyennes ne suffit pas à établir un gain global statistiquement significatif.
+Hyperfine inclut la génération de carte et l'exécution du processus ; les
+micro-benchmarks Run de cette version ne calculent que 50 tours maximum.
+
+**Interprétation mémoire–CPU.** La réduction des allocations est démontrée,
+mais elle ne produit pas une accélération systématique. Le double tampon ajoute
+une grille persistante de 2 Mio en 1024² et modifie les accès mémoire. Son rôle
+dans les régressions est une hypothèse à tester avec une variante sans second
+tampon de cellules ; aucun profil matériel ne prouve ici la cause des écarts.
+
+**Banc B et portabilité :** en attente de mesures x86 sur le même commit de
+code `1d3a093`. Aucun gain de portabilité n'est revendiqué à ce stade.
+
 ### 3.1 Mémoire & localité de cache
 
 - Grille plate `[]uint8` + double tampon, et tampon d'ignition réutilisé : zéro allocation par tour.
@@ -581,6 +676,34 @@ si le gain est déjà net dans ces conditions, il ne fera que croître sur une b
 ---
 
 ## 4. Confrontation critique & échec constructif — /3
+
+### Résultat mitigé observé — double tampon de flat
+
+**Tentative :** grille contiguë, double tampon de cellules et tampon d'allumage
+réutilisé, mesuré au commit `1d3a093` ; optimisation mixte macro/micro (§3, étape 1).
+
+**Hypothèse initiale :** supprimer les allocations temporaires par tour pour
+réduire leur coût, tout en améliorant le stockage des cellules.
+
+**Mesure :** zéro allocation par Step est atteint. Pourtant, en scénario
+embrasement 2048², Step passe de 23,67 ms à 23,89 ms, soit une régression
+d'environ 0,9 % (p = 0,019). En 1024², aucun gain significatif n'est établi
+(p = 0,218). Source : [benchstat](../results/1d3a093/m1-air/benchstat.txt).
+
+**Explication à vérifier :** le second tampon ajoute 2N octets de stockage
+persistant et change les accès mémoire. Cette cause n'est pas démontrée ; une
+variante à une seule grille permettra d'isoler son effet en conservant la
+réutilisation du tampon d'allumage. La mise à jour en deux phases autorise cette
+variante sans modifier les règles de propagation.
+
+**Enseignement :** réduire le volume cumulé alloué ne garantit pas une réduction
+du temps CPU ni du pic de mémoire.
+
+**Retour arrière :** aucun revert effectué à ce stade. La version et ses
+résultats sont conservés pour la comparaison ; la variante reste à implémenter
+et à mesurer avant de décider de la version à retenir.
+
+### Autres pistes à explorer
 
 > **Tentative :** …
 > - **Hypothèse initiale :** …

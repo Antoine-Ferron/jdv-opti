@@ -4,8 +4,8 @@
 package engines
 
 import (
+	_ "gol-wildfire/internal/flat"  // étape 1 : grille plate, double tampon, tampon d'ignition réutilisé
 	_ "gol-wildfire/internal/naive" // baseline — ne plus modifier après les mesures de référence
-	// _ ".../flat"      // étape 1 : grille plate, double tampon, tampon d'ignition réutilisé
 	// _ ".../counters"  // étape 2 : Burning incrémental (6,74 % sur M1)
 	// _ ".../ghost"     // étape 3 : bordure fantôme, plus aucun modulo (41 % sur x86, 5 % sur M1)
 	// _ ".../bitpack"   // étape 4 : plans de bits, propagation par OU
