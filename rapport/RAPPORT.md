@@ -537,8 +537,44 @@ une grille persistante de 2 Mio en 1024² et modifie les accès mémoire. Son r�
 dans les régressions est une hypothèse à tester avec une variante sans second
 tampon de cellules ; aucun profil matériel ne prouve ici la cause des écarts.
 
-**Banc B et portabilité :** en attente de mesures x86 sur le même commit de
-code `1d3a093`. Aucun gain de portabilité n'est revendiqué à ce stade.
+**Banc B — contrôle de portabilité.** Mesures x86 sur le même commit de code
+`1d3a093` ([benchstat](../results/1d3a093/x86-controle/benchstat.txt)) :
+
+| Mesure (1024²) | naive | flat | Écart |
+|---|---:|---:|---:|
+| `Run` scénario front | 388,2 ms ± 17 % | **115,5 ms ± 1 %** | flat ×3,4 |
+| `Run` scénario embrasement | 204,5 ms | 183,3 ms | flat +11,6 % |
+| `Step` embrasement (état chauffé) | 12,75 ms | 12,55 ms | flat +1,6 % |
+| Hyperfine, 500 tours | 8,4190 s | 8,3960 s | flat +0,3 % |
+
+Sur le banc A, la même mesure `Run` front donne 160,6 ms contre 161,1 ms : **aucun
+écart**. La même optimisation, le même benchmark, et un facteur 3,4 d'un banc à
+l'autre.
+
+**Une hypothèse posée puis réfutée.** L'échelonnement des gains — ×3,4 sur 50
+tours, +1,6 % sur un tour isolé, +0,3 % sur 500 tours — évoquait un coût fixe
+payé une seule fois, soit la construction du moteur : `naive` y fait 1026
+allocations, `flat` 4. `BenchmarkNew` a été écrit pour le vérifier et a réfuté
+l'hypothèse : construire coûte **0,32 ms à naive et 0,37 ms à flat** en 1024²,
+quand l'écart à expliquer est de **273 ms**. `flat` est même *plus lent* à
+construire, allouant 5,2 Mio contre 2,1 Mio.
+
+**Ce que les chiffres imposent donc.** L'écart est bien par tour, et il dépend de
+la **densité de feu** : massif quand peu de cases brûlent (scénario front),
+négligeable sur une carte saturée (`Step` sur état chauffé, +1,6 %). Les mesures
+intermédiaires s'alignent sur cette lecture — `Run` embrasement part de 64 foyers
+et ne sature qu'en cours de route, d'où ses +11,6 % ; Hyperfine mesure 500 tours
+en régime saturé, d'où ses +0,3 %.
+
+L'explication mécanique reste à établir. La piste à instruire est celle du
+balayage d'application, qui parcourt toute la grille quel que soit le nombre de
+cases en feu : avec `[][]Cell`, il saute entre 1024 blocs dispersés ; avec une
+grille contiguë, il est séquentiel et le préchargement matériel opère. Quand
+beaucoup de cases brûlent, c'est la propagation vers les huit voisins qui domine,
+et elle est dispersée dans les deux implémentations. **Cette explication n'est pas
+prouvée** : la vérifier demande un profil `flat` sur les deux bancs, et une mesure
+de `Step` en scénario front — que le protocole actuel exclut pour cause de dérive
+d'état (§1.2).
 
 ### 3.1 Mémoire & localité de cache
 
@@ -617,22 +653,31 @@ C'est un rappel plutôt qu'un format concret, `internal/snapshot` important déj
 
 #### Synthèse — sérialisation
 
-Carte 1024², état relevé au tour 50, commit `e298d02`, dix exécutions par mesure.
-Source : [benchstat](../results/e298d02/x86-controle/benchstat.txt),
-[mesures brutes](../results/e298d02/x86-controle/bench.txt).
+Carte 1024², état relevé au tour 50, commit `1d3a093`, dix exécutions par mesure.
+Sources : [banc A](../results/1d3a093/m1-air/benchstat.txt),
+[banc B](../results/1d3a093/x86-controle/benchstat.txt).
 
 La taille par case est publiée comme métrique du benchmark (`o/case`) plutôt que relevée à part :
 elle est ainsi reproductible et versionnée avec les temps, alors même qu'elle ne dépend pas de la
-machine. Les temps et allocations, eux, sont ceux du **banc B** et restent à confirmer sur le banc A.
+machine — ce que les deux campagnes confirment au chiffre près.
 
-| Format | Taille | Par case | Écriture | Allocations |
+| Format | Taille | Par case | Écriture — banc A | Écriture — banc B |
 |---|---:|---:|---:|---:|
-| JSON naïf | 120,4 Mo | 114,8 o | 583,2 ms ± 20 % | 73,5 ± 35 % |
-| Protobuf | 4,19 Mo | 4,000 o | 17,07 ms ± 9 % | 6 |
-| bit-packé | 1,57 Mo | 1,500 o | **1,398 ms ± 2 %** | **3** |
-| bit-packé, décor omis | **0,524 Mo** | **0,500 o** | 0,830 ms | **2** |
+| JSON naïf | 120,4 Mo | 114,8 o | 443,1 ms ± 8 % | 583,2 ms ± 20 % |
+| Protobuf | 4,19 Mo | 4,000 o | 17,30 ms ± 0 % | 17,07 ms ± 9 % |
+| bit-packé | 1,57 Mo | 1,500 o | 2,037 ms ± 1 % | 1,398 ms ± 2 % |
+| bit-packé, décor omis | **0,524 Mo** | **0,500 o** | **1,341 ms** | **0,830 ms** |
 
-**Le temps baisse plus vite que la taille.** Entre JSON et le format bit-packé, la taille est divisée
+**Portabilité : le gain tient, avec un écart qui s'explique.** Entre JSON et le format bit-packé, le
+facteur est de **×217 sur le banc A** et de **×417 sur le banc B**. L'écart ne vient pas du format
+compact — Protobuf donne d'ailleurs le même temps sur les deux bancs, 17,3 contre 17,1 ms — mais de
+JSON, plus lent de 32 % sur le banc B. C'est le coût des allocations sous WSL2, déjà observé au
+§3.1 : l'encodeur JSON en fait 73 en moyenne, le format bit-packé 3.
+
+Autrement dit, **plus une optimisation supprime d'allocations, plus elle rapporte sur le banc B** —
+et ce banc est aussi le seul où `flat` gagne quoi que ce soit.
+
+**Le temps baisse plus vite que la taille.** Sur le banc B, entre JSON et le format bit-packé, la taille est divisée
 par 77 et le temps par **417**. L'écart tient aux allocations : l'encodeur JSON en fait 73 en moyenne,
 avec une dispersion de 35 % — son tampon double à chaque dépassement, et le nombre de doublements
 dépend de l'état du tas — quand le format bit-packé alloue exactement sa sortie en **3 allocations**
