@@ -65,3 +65,7 @@ func Run(t *testing.T, f snapshot.Format) {
 		}
 	})
 }
+
+// Etat est exporté pour les tests propres à un format : il engendre une carte,
+// la fait brûler, et relève l'état obtenu.
+func Etat(w, h int, seed int64, tours int) *snapshot.State { return etat(w, h, seed, tours) }
