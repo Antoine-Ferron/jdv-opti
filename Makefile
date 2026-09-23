@@ -3,9 +3,10 @@ IMPL  ?= naive
 SIZE  ?= 1024
 TURNS ?= 50
 FIRES ?= 64
+ADDR  ?= 127.0.0.1:8081
 PROF  := results/profiles
 
-.PHONY: help build test env bench quick demo profile flame layout escape tools clean
+.PHONY: help build test env bench quick demo web profile flame layout escape tools clean
 
 help: ## Affiche cette aide
 	@grep -E '^[a-z]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-9s %s\n", $$1, $$2}'
@@ -50,3 +51,6 @@ tools: ## Installe benchstat
 
 clean: ## Supprime binaires et snapshots (les résultats sont conservés)
 	rm -rf bin snapshots
+
+web: ## Lance la carte interactive (ADDR=0.0.0.0:8081 pour y accéder depuis Windows)
+	go run ./cmd/web -addr $(ADDR)

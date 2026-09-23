@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulation d’incendie</title>
+<style>
+  :root{color-scheme:dark;font-family:system-ui,sans-serif;background:#101917;color:#edf4ee}
+  *{box-sizing:border-box} body{margin:0} main{max-width:1280px;margin:auto;padding:40px 24px}
+  .eyebrow{color:#9ac5ac;text-transform:uppercase;letter-spacing:.18em;font-size:12px} h1{font-size:clamp(32px,5vw,52px);letter-spacing:-.05em;margin:12px 0} .intro{color:#aebeb4;line-height:1.6;margin-bottom:30px}
+  .layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;align-items:start}
+  .board,.panel{background:#18251f;border:1px solid #33463b;border-radius:20px;padding:20px}
+  .board-header{display:flex;justify-content:space-between;gap:10px;margin-bottom:16px;font-size:13px;color:#b6c9bc}
+  canvas{display:block;width:100%;height:auto;image-rendering:pixelated;border-radius:6px;background:#101917}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:14px 0 0;font-size:13px;color:#aebeb4}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .swatch{width:12px;height:12px;border-radius:3px;display:inline-block}
+  h2{font-size:18px;margin:0 0 18px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px}.stat{background:#101917;padding:12px;border-radius:12px}.stat span{display:block;color:#aebeb4;font-size:12px}.stat strong{display:block;font-size:22px;margin-top:5px;font-variant-numeric:tabular-nums}
+  button,select,input[type=number]{font:inherit;border-radius:10px;border:1px solid #486252;padding:12px;background:#253b2e;color:#edf4ee;width:100%} button{cursor:pointer;margin-bottom:10px}button:hover{background:#35513e}button:disabled{opacity:.45;cursor:default}.primary{background:#ff8a3d;color:#2a1405;border:0;font-weight:650}.primary:hover{background:#ffa463}label{display:block;margin:20px 0 8px;font-size:14px}input[type=range]{width:100%;accent-color:#ff8a3d}select{margin-bottom:12px}
+  .note{font-size:13px;line-height:1.7;color:#aebeb4}.rules{margin-top:24px;border-top:1px solid #33463b;padding-top:20px}.rules p{margin:8px 0}.error{color:#ffb9a9;min-height:1.5em;font-size:14px}footer{color:#82998b;font-size:12px;margin-top:24px}button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #ffd7b5;outline-offset:3px}
+  @media(max-width:760px){main{padding:24px 16px}.layout{grid-template-columns:1fr}.panel{padding:20px}.board{padding:12px}}
+</style>
+<main>
+  <div class="eyebrow">Laboratoire de simulation</div>
+  <h1>Incendie de forêt<span style="color:#ff8a3d">.</span></h1>
+  <p class="intro">Un feu part, le terrain décide. L’eau l’arrête, le vent le projette deux cases plus loin, la forêt brûle deux fois plus longtemps que la plaine.</p>
+  <div class="layout">
+    <section class="board" aria-label="Simulation">
+      <div class="board-header"><span>80 × 50 cases · bords reliés</span><span id="status" role="status">Chargement…</span></div>
+      <canvas id="grid" width="960" height="600" role="img" aria-label="Carte de l’incendie : les cases orangées brûlent, les grises sont des cendres"></canvas>
+      <p class="legend">
+        <span><i class="swatch" style="background:#2a5f8f"></i>Eau</span>
+        <span><i class="swatch" style="background:#6f7d3a"></i>Plaine</span>
+        <span><i class="swatch" style="background:#2f5d34"></i>Forêt</span>
+        <span><i class="swatch" style="background:#ff7a1c"></i>En feu</span>
+        <span><i class="swatch" style="background:#4b4b4b"></i>Cendres chaudes</span>
+        <span><i class="swatch" style="background:#5fd7e0"></i>Vent (direction)</span>
+      </p>
+    </section>
+    <aside class="panel">
+      <h2>Ton incendie</h2>
+      <div class="stats">
+        <div class="stat"><span>Tour</span><strong id="turn">0</strong></div>
+        <div class="stat"><span>En feu</span><strong id="burning">0</strong></div>
+        <div class="stat"><span>Cendres</span><strong id="ashes">0</strong></div>
+      </div>
+      <button id="play" class="primary" disabled>▶ Lecture</button>
+      <button id="step" disabled>Avancer d’un tour</button>
+      <label for="speed">Vitesse · <span id="speedValue">5</span> tours/s</label>
+      <input id="speed" type="range" min="1" max="20" value="5">
+      <label for="preset">Paysage</label>
+      <select id="preset">
+        <option value="varie">Varié · lacs, rivières et massifs</option>
+        <option value="eau">Beaucoup d’eau · pare-feu partout</option>
+        <option value="foret">Forêt dense · brûle longtemps</option>
+        <option value="vent">Grand vent · saute les rivières</option>
+      </select>
+      <label for="seed">Graine · même graine, même carte</label>
+      <input id="seed" type="number" value="42" min="0" step="1">
+      <button id="reset" disabled>↺ Nouvel incendie</button>
+      <div id="error" class="error" role="alert"></div>
+      <div class="rules"><h2>Les règles</h2>
+        <p class="note">Une <b>plaine</b> brûle 1 tour, une <b>forêt</b> 2. Ensuite la case reste trop chaude pour rebrûler, 2 ou 3 tours.</p>
+        <p class="note">L’<b>eau</b> ne brûle jamais : le feu la contourne.</p>
+        <p class="note">Une case <b>ventée</b> n’enflamme pas ce qui est derrière elle, et projette le feu <b>deux cases</b> sous le vent — le seul moyen de franchir une rivière.</p>
+        <p class="note">Les bords se rejoignent : le feu ressort de l’autre côté.</p>
+      </div>
+    </aside>
+  </div>
+  <footer>Calculé par le moteur Go « naive » · Les règles complètes sont dans internal/fire/REGLES.md</footer>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const ctx = $('grid').getContext('2d');
+const CELL = 12;
+// Les tableaux d'octets arrivent en base64 : c'est ainsi que Go sérialise []byte.
+const bytes = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+// Mêmes directions que fire.Offsets, dans l'ordre trigonométrique.
+const DIRS = [[1,0],[1,-1],[0,-1],[-1,-1],[-1,0],[-1,1],[0,1],[1,1]];
+const TERRAIN = ['#2a5f8f', '#6f7d3a', '#2f5d34'];
+
+let w = 0, h = 0, terrain, wind, fire, rest;
+let running = false, busy = false, extinct = false, timer;
+
+function controls() {
+  $('play').textContent = running ? 'Ⅱ Pause' : '▶ Lecture';
+  $('play').disabled = !terrain || extinct;
+  $('step').disabled = busy || running || !terrain || extinct;
+  $('reset').disabled = busy;
+  $('preset').disabled = busy;
+  $('status').textContent = extinct ? '● Éteint' : running ? '● En cours' : '● En pause';
+}
+
+function draw() {
+  ctx.fillStyle = '#101917';
+  ctx.fillRect(0, 0, w * CELL, h * CELL);
+  let ashes = 0;
+  for (let i = 0; i < terrain.length; i++) {
+    const x = (i % w) * CELL, y = Math.floor(i / w) * CELL;
+    if (fire[i] > 0) {
+      // Une forêt qui vient de s'embraser (2 tours restants) brûle plus fort.
+      ctx.fillStyle = fire[i] > 1 ? '#ffb020' : '#ff7a1c';
+    } else if (rest[i] > 0) {
+      ctx.fillStyle = '#4b4b4b';
+      ashes++;
+    } else {
+      ctx.fillStyle = TERRAIN[terrain[i]];
+    }
+    ctx.fillRect(x, y, CELL, CELL);
+  }
+  // Les cases ventées sont rares : une flèche par-dessus reste lisible.
+  ctx.strokeStyle = '#5fd7e0';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < wind.length; i++) {
+    if (!wind[i]) continue;
+    const [dx, dy] = DIRS[wind[i] - 1];
+    const cx = (i % w) * CELL + CELL / 2, cy = Math.floor(i / w) * CELL + CELL / 2;
+    ctx.moveTo(cx - dx * 4, cy - dy * 4);
+    ctx.lineTo(cx + dx * 4, cy + dy * 4);
+  }
+  ctx.stroke();
+  $('ashes').textContent = ashes;
+}
+
+function pause() { running = false; clearTimeout(timer); controls(); }
+
+async function request(action) {
+  if (busy) return;
+  busy = true; controls(); $('error').textContent = '';
+  try {
+    const response = await fetch('/api/simulation', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action, preset: $('preset').value, seed: Number($('seed').value) || 0}),
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!response.ok) throw new Error('Erreur du serveur (' + response.status + ').');
+    const data = await response.json();
+    if (data.terrain) {           // le décor n'est envoyé qu'au reset
+      w = data.width; h = data.height;
+      terrain = bytes(data.terrain); wind = bytes(data.wind);
+    }
+    fire = bytes(data.fire); rest = bytes(data.rest);
+    extinct = data.extinct;
+    $('turn').textContent = data.turn;
+    $('burning').textContent = data.burning;
+    draw();
+    if (extinct) pause();
+  } catch (error) {
+    pause(); $('error').textContent = 'Impossible de charger la simulation. Vérifie que le serveur est lancé, puis relance un incendie.';
+  } finally {
+    busy = false; controls();
+    if (running) timer = setTimeout(() => request('step'), 1000 / Number($('speed').value));
+  }
+}
+
+$('play').onclick = () => {
+  if (running) { pause(); return; }
+  running = true; controls(); if (!busy) request('step');
+};
+$('step').onclick = () => request('step');
+$('reset').onclick = () => { pause(); extinct = false; request('reset'); };
+$('preset').onchange = () => { pause(); extinct = false; request('reset'); };
+$('speed').oninput = () => $('speedValue').textContent = $('speed').value;
+// Un input[type=number] qui a le focus change de valeur à la molette : sans ça,
+// faire défiler la page suffit à changer la graine sous les pieds du visiteur.
+$('seed').addEventListener('wheel', () => $('seed').blur());
+request('reset');
+</script>
+</html>
