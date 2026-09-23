@@ -497,8 +497,8 @@ C'est un rappel plutôt qu'un format concret, `internal/snapshot` important déj
 > **Défauts volontaires :** `[S1]` une structure par case avec ses noms de champs répétés ;
 > `[S2]` le décor réécrit à chaque snapshot alors qu'il est immuable ; `[S3]` encodage texte ;
 > `[S4]` état entièrement matérialisé avant écriture.
-> **Résultat (carte 1024²) :** 120 410 181 octets, soit **114,83 octets par case** — pour un état
-> qui tient sur 4 bits.
+> **Résultat (carte 1024²) :** 120,4 Mo, soit **114,8 octets par case** — pour un état qui tient
+> sur 4 bits.
 
 #### Étape I/O-2 — Protobuf
 
@@ -508,8 +508,8 @@ C'est un rappel plutôt qu'un format concret, `internal/snapshot` important déj
 > `[packed = true]` — sans quoi l'étiquette du champ serait réécrite devant chaque valeur.
 > **Commande de vérification :** `go test ./internal/snapshot/` et
 > `go test ./internal/bench -run '^$' -bench 'Snapshot' -benchmem`
-> **Résultat :** **4,00 octets par case**, exactement le plancher prévu — quatre grilles, un octet
-> de varint minimum par valeur. Gain **×28,7** sur JSON.
+> **Résultat :** **4,000 octets par case**, exactement le plancher prévu — quatre grilles, un octet
+> de varint minimum par valeur. Gain **×28,7** en taille, **×34** en temps.
 
 #### Étape I/O-3 — format bit-packé
 
@@ -517,34 +517,63 @@ C'est un rappel plutôt qu'un format concret, `internal/snapshot` important déj
 > donc deux cases par octet ; et le décor étant immuable, il n'a à être écrit qu'une fois par série.
 > **Modification :** `internal/snapshot/packed.go`, en-tête de 17 octets puis un quartet par case,
 > avec un drapeau qui rend le décor optionnel.
-> **Résultat :** **1,50 octet par case** avec le décor, **0,50 avec le décor omis** — soit
-> **×230 sur JSON** et ×8 sur Protobuf.
+> **Résultat :** **1,500 octet par case** avec le décor, **0,500 sans** — soit **×230 sur JSON**
+> en taille et **×417 en temps**, et ×2,7 sur Protobuf.
 
 #### Synthèse — sérialisation
 
-Carte 1024², état relevé au tour 50. Tailles indépendantes du banc ; temps et allocations mesurés sur
-le **banc B**, trois exécutions.
+Carte 1024², état relevé au tour 50, commit `e298d02`, dix exécutions par mesure.
+Source : [benchstat](../results/e298d02/x86-controle/benchstat.txt),
+[mesures brutes](../results/e298d02/x86-controle/bench.txt).
 
-| Format | Taille | Par case | Écriture | Alloué | Allocations |
-|---|---:|---:|---:|---:|---:|
-| JSON naïf | 120,4 Mo | 114,83 o | ~553 ms | 1,17 Go | quelques dizaines |
-| Protobuf | 4,19 Mo | 4,00 o | 17,0 ms | 21,0 Mo | 6 |
-| bit-packé | 1,57 Mo | 1,50 o | **1,40 ms** | 1,57 Mo | **3** |
-| bit-packé, décor omis | **0,52 Mo** | **0,50 o** | — | — | — |
+La taille par case est publiée comme métrique du benchmark (`o/case`) plutôt que relevée à part :
+elle est ainsi reproductible et versionnée avec les temps, alors même qu'elle ne dépend pas de la
+machine. Les temps et allocations, eux, sont ceux du **banc B** et restent à confirmer sur le banc A.
 
-**Le temps suit la taille, mais plus vite qu'elle.** Entre JSON et le format bit-packé, la taille est
-divisée par 77 et le temps par 395. L'écart vient des allocations : produire 120 Mo de JSON en a
-demandé **1,17 Go**, le tampon de l'encodeur doublant à chaque dépassement, quand le format
-bit-packé alloue exactement sa sortie en **3 allocations**. Le débit par octet écrit le confirme :
-environ 1 120 Mo/s pour le format bit-packé contre 200 à 260 Mo/s pour les deux autres — ce ne sont
-pas seulement moins d'octets, ce sont des octets moins chers.
+| Format | Taille | Par case | Écriture | Allocations |
+|---|---:|---:|---:|---:|
+| JSON naïf | 120,4 Mo | 114,8 o | 583,2 ms ± 20 % | 73,5 ± 35 % |
+| Protobuf | 4,19 Mo | 4,000 o | 17,07 ms ± 9 % | 6 |
+| bit-packé | 1,57 Mo | 1,500 o | **1,398 ms ± 2 %** | **3** |
+| bit-packé, décor omis | **0,524 Mo** | **0,500 o** | 0,830 ms | **2** |
+
+**Le temps baisse plus vite que la taille.** Entre JSON et le format bit-packé, la taille est divisée
+par 77 et le temps par **417**. L'écart tient aux allocations : l'encodeur JSON en fait 73 en moyenne,
+avec une dispersion de 35 % — son tampon double à chaque dépassement, et le nombre de doublements
+dépend de l'état du tas — quand le format bit-packé alloue exactement sa sortie en **3 allocations**
+déterministes. La dispersion des temps le confirme : ±20 % pour JSON contre ±2 % pour le bit-packé.
+
+C'est aussi ce qui explique que le format le plus compact soit le plus *régulier* : il ne dépend ni
+du contenu de la carte, ni de l'état du ramasse-miettes. Une taille prévisible est d'ailleurs une
+qualité en soi pour un format d'archive — elle permet de dimensionner un tampon à l'avance, ce que
+l'étape I/O-5 exploitera avec `sync.Pool`.
+
+#### Étape I/O-4 — persistance PostgreSQL *(hypothèses posées avant l'implémentation)*
+
+Les deux hypothèses ci-dessous sont écrites **avant** d'écrire le code, conformément à
+`constitution.md` §3. Elles seront confrontées à la mesure, y compris si elles se révèlent fausses.
+
+> **Hypothèse A — l'index.** Une table de tours porte 500 lignes par exécution et quelques dizaines
+> de milliers après plusieurs campagnes. Une recherche par empreinte sans index impose un `Seq Scan`,
+> dont le coût croît linéairement avec le nombre de lignes ; un index B-tree sur l'empreinte doit le
+> transformer en `Index Scan` à coût logarithmique. **Gain attendu : d'un ordre de grandeur sur le
+> temps de requête dès quelques dizaines de milliers de lignes, et nul — voire négatif — en deçà de
+> quelques centaines**, l'index coûtant alors plus à maintenir qu'il ne fait gagner.
+> **Vérification :** `EXPLAIN (ANALYZE, BUFFERS)` sur la même requête, sans puis avec index, à
+> plusieurs volumes de table.
+
+> **Hypothèse B — le groupage.** Insérer 500 tours un par un impose 500 allers-retours réseau ; le
+> coût dominant est la **latence par requête**, pas le volume transmis — chaque ligne fait quelques
+> dizaines d'octets. Grouper les insertions en une seule commande `COPY` doit donc faire chuter le
+> temps total d'un facteur voisin du nombre d'allers-retours économisés. **Gain attendu : un ordre de
+> grandeur au moins, même sur une base locale, où la latence est pourtant minimale.**
+> **Vérification :** benchmark comparant insertion unitaire et `COPY`, à 500 et 5 000 tours.
+
+L'intérêt de la seconde est qu'elle se vérifie sur `localhost`, où la latence réseau est quasi nulle :
+si le gain est déjà net dans ces conditions, il ne fera que croître sur une base distante.
 
 #### À venir
 
-- **Base de données** : historique des tours (tour, empreinte, cases en feu, surface brûlée). Une
-  requête d'analyse exécutée **sans puis avec index**, avec `EXPLAIN ANALYZE` avant/après et le plan
-  commenté (`Seq Scan` → `Index Scan`) ; puis insertion tour par tour contre envoi groupé (`COPY`),
-  qui est le vrai sujet d'I/O réseau — c'est le nombre d'allers-retours qui coûte, pas le volume.
 - **Cache** : `sync.Pool` sur les tampons de sérialisation, et LRU des empreintes déjà vues. À
   mesurer et non à supposer : un pool inutile augmente la pression mémoire au lieu de la réduire,
   et ferait un bon candidat pour le §4.
