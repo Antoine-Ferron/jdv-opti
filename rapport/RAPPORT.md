@@ -145,8 +145,24 @@ de ce que fait le programme.
 
 ### 1.3 Mesures de référence
 
-Coller `results/<run>/hyperfine-stats.md` (moyenne, médiane, écart-type, variance, CV).
-Commenter le coefficient de variation : < 2 % = mesure stable.
+#### Banc A — référence
+
+*À produire* : coller `results/<commit>/<banc-A>/hyperfine-stats.md` (moyenne, médiane, écart-type,
+variance, CV) et commenter le coefficient de variation.
+
+#### Banc B — contrôle
+
+Première campagne, commit `19a9deb`, carte 1024², 64 foyers, 500 tours, Hyperfine `-N --warmup 3
+--runs 15` (`results/19a9deb/x86-controle/`) :
+
+| Moyenne | Médiane | Écart-type | Variance | CV | Min | Max |
+|---|---|---|---|---|---|---|
+| 8,4300 s | 8,3872 s | 0,1353 s | 1,831 × 10⁻² s² | **1,6 %** | 8,2862 s | 8,7089 s |
+
+Coefficient de variation à 1,6 %, sous le seuil de 2 % : la mesure est stable malgré une fréquence
+non verrouillée et la virtualisation WSL2 — c'est le warmup et le nombre de runs qui l'assurent.
+Ces valeurs absolues ne sont pas des résultats du rapport ; seuls les ratios de gain mesurés sur ce
+banc seront cités, en regard de ceux du banc A.
 
 ---
 
@@ -175,11 +191,20 @@ octets alloués, part du temps passée dans `runtime.mallocgc` et dans le GC (`G
 
 Pour chaque goulot, l'enchaînement **symptôme mesuré → cause mécanique → preuve** :
 
-1. **`Fingerprint`, xx % du CPU `[F6]`** — un `fmt.Sprintf` par case active, puis une conversion
-   `string → []byte` et un SHA-256 : réflexion, allocation d'une chaîne à chaque appel, des
-   centaines de milliers d'allocations par appel → pression GC. Sur le jeu de la vie, la même
-   construction coûtait *plus cher qu'un tour de simulation entier* ; vérifier si c'est aussi le cas
-   ici, le nombre de cases actives étant du même ordre.
+1. **`Fingerprint` coûte 1,7 fois un tour de simulation entier `[F6]`** — un `fmt.Sprintf` par case
+   active, puis une conversion `string → []byte` et un SHA-256 : réflexion, allocation d'une chaîne
+   à chaque appel. Mesuré à 1024², 64 foyers :
+
+   | | `Step` (un tour) | `Fingerprint` (un appel) |
+   |---|---|---|
+   | Temps | 12,19 ms | **20,62 ms** |
+   | Allocations | **1** | **451 200** |
+   | Octets alloués | 1,000 Mio | 16,83 Mio |
+
+   Le compte d'allocations et le volume alloué sont des propriétés du code, identiques sur les deux
+   bancs ; seuls les temps sont à reconfirmer sur le banc A. Le rapport de 1,7 est le premier
+   résultat exploitable de l'audit : **l'empreinte coûte plus cher que le calcul qu'elle
+   accompagne**, alors qu'elle n'est qu'un moyen de détecter un état déjà vu.
 2. **La propagation, xx % du CPU `[F5]` `[F1]`** — 8 modulos par case en feu (division entière), un
    de plus pour le saut du vent (REGLES.md §5), et une double indirection `[][]Cell` : chaque ligne
    est un bloc distinct du tas, les lignes *y-1*, *y* et *y+1* ne sont pas contiguës.
@@ -203,6 +228,14 @@ retenu : **elles sont méthodologiques, à reproduire ici avant d'être citées 
    n'alloue qu'une fois par tour. Seule la contention CPU la ralentit, et linéairement. Corollaire
    utile : une machine plus lente ne fait pas apparaître un gain qui n'existe pas — c'est la
    mesure normalisée (cycles par case) qui démasque une implémentation coûteuse, pas le chronomètre.
+
+**Une variance résiduelle, et sa cause.** Dans la campagne de référence, deux mesures restent
+bruitées : `Step/embrasement/size=2048` (±13 %) et `Run/front/size=1024` (±19 %). Ce sont
+précisément les deux qui allouent le plus — 4,000 Mio par tour et 52,03 Mio par itération — et le
+GC y intervient à des moments variables. Autrement dit, **la baseline est instable parce qu'elle
+alloue** : c'est `[F3]`, et ces deux lignes devraient se resserrer d'elles-mêmes dès la première
+étape de l'axe mémoire. Conséquence à assumer d'ici là : sur ces deux lignes, un gain inférieur à
+~20 % ne sera pas déclaré significatif par benchstat.
 
 ---
 
