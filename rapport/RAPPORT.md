@@ -453,8 +453,8 @@ données. Micro : suppression du tampon d'allumage temporaire, désormais allou�
 une fois et réinitialisé avec `clear` à chaque tour.
 
 **Hypothèse :** passer de 1 allocation de 1 Mio par Step à 0 allocation et
-0 octet par tour sur 1024². Le gain de temps reste à mesurer ; moins
-d'allocations ne garantit pas un gain proportionnel de CPU.
+0 octet par tour sur 1024². Cette hypothèse porte sur les allocations ;
+le gain CPU éventuel doit être établi séparément.
 
 **Implémentation :** la propagation lit la grille courante et marque un tampon
 `[]bool`. Les transitions écrivent toutes les cellules dans la seconde grille,
@@ -482,17 +482,57 @@ et un test `AllocsPerRun` qui vérifie zéro allocation par Step sur 67 × 45.
 L'analyse `go build -gcflags=-m ./internal/flat` documente les allocations du
 constructeur et de l'empreinte ; Step ne contient pas d'allocation de tampon.
 
-**Vérification de performance à exécuter après commit sur secteur :**
+**Commande de campagne exécutée sur le banc M1, commit de code `1d4a064` :**
 
 ```bash
 make bench BANC=m1-air
-make profile IMPL=flat BANC=m1-air
 ```
 
-**Résultats banc A / banc B / portabilité :** à mesurer sur le même commit de
-code. Aucun gain de temps ni gain GC n'est revendiqué à ce stade. Comparer
-naive et flat dans la même campagne et préciser que BenchmarkRun et Hyperfine
-peuvent avoir des nombres de tours différents suivant le protocole versionné.
+**Résultats banc A — Apple M1.** Sources :
+[benchstat](../results/1d4a064/m1-air/benchstat.txt),
+[mesures brutes](../results/1d4a064/m1-air/bench.txt) et
+[tests](../results/1d4a064/m1-air/tests.txt).
+
+| Mesure | naive | flat | Conclusion |
+|---|---:|---:|---|
+| Allocations par Step, 1024² | 1 | 0 | Objectif atteint |
+| Octets alloués par Step, 1024² | 1 Mio | 0 | Tampon temporaire supprimé |
+| Temps médian Step/embrasement, 1024² | 9,982 ms | 9,973 ms | Pas de différence significative, p = 0,393 |
+| Temps médian Step/embrasement, 2048² | 23,62 ms | 24,07 ms | flat environ 1,9 % plus lent, p = 0,004 |
+
+Sur BenchmarkRun en 1024², le volume cumulé alloué passe de 52,03 Mio à
+5 Mio, soit environ 90,4 % de réduction ; les allocations passent de 1 076
+à 4 par exécution, construction du moteur comprise. Il ne s'agit pas du pic de
+mémoire occupée. Step n'alloue plus pour les trois tailles testées.
+
+Les résultats CPU sont mixtes : Step en 256² et Run/front en 512² s'améliorent,
+mais Run/front en 1024², Run/embrasement aux deux tailles et Fingerprint
+présentent de petites régressions significatives dans cette campagne.
+Benchstat prend flat comme référence : un pourcentage négatif dans la colonne
+naive indique que naive est plus rapide. Les p-values affichées `0.000` sont
+arrondies, pas nulles.
+
+**Temps global — 500 tours demandés.** Source :
+[statistiques Hyperfine](../results/1d4a064/m1-air/hyperfine-stats.md).
+
+| Moteur | Temps moyen | Écart-type | CV |
+|---|---:|---:|---:|
+| naive | 6,3787 s | 0,1496 s | 2,3 % |
+| flat | 6,3188 s | 0,0333 s | 0,5 % |
+
+La diminution observée de la moyenne est d'environ 0,9 %. Ce rapport de
+moyennes ne suffit pas à établir un gain global statistiquement significatif.
+Hyperfine inclut la génération de carte et l'exécution du processus ; les
+micro-benchmarks Run de cette version ne calculent que 50 tours maximum.
+
+**Interprétation mémoire–CPU.** La réduction des allocations est démontrée,
+mais elle ne produit pas une accélération systématique. Le double tampon ajoute
+une grille persistante de 2 Mio en 1024² et modifie les accès mémoire. Son rôle
+dans les régressions est une hypothèse à tester avec une variante sans second
+tampon de cellules ; aucun profil matériel ne prouve ici la cause des écarts.
+
+**Banc B et portabilité :** en attente de mesures x86 sur le même commit de
+code `1d4a064`. Aucun gain de portabilité n'est revendiqué à ce stade.
 
 ### 3.1 Mémoire & localité de cache
 
@@ -544,6 +584,34 @@ Plan de travail dans l'ordre ci-dessous, un commit par étape.*
 ---
 
 ## 4. Confrontation critique & échec constructif — /3
+
+### Résultat mitigé observé — double tampon de flat
+
+**Tentative :** grille contiguë, double tampon de cellules et tampon d'allumage
+réutilisé, commit `1d4a064` ; optimisation mixte macro/micro (§3, étape 1).
+
+**Hypothèse initiale :** supprimer les allocations temporaires par tour pour
+réduire leur coût, tout en améliorant le stockage des cellules.
+
+**Mesure :** zéro allocation par Step est atteint. Pourtant, en scénario
+embrasement 2048², Step passe de 23,62 ms à 24,07 ms, soit une régression
+d'environ 1,9 % (p = 0,004). En 1024², aucun gain significatif n'est établi
+(p = 0,393). Source : [benchstat](../results/1d4a064/m1-air/benchstat.txt).
+
+**Explication à vérifier :** le second tampon ajoute 2N octets de stockage
+persistant et change les accès mémoire. Cette cause n'est pas démontrée ; une
+variante à une seule grille permettra d'isoler son effet en conservant la
+réutilisation du tampon d'allumage. La mise à jour en deux phases autorise cette
+variante sans modifier les règles de propagation.
+
+**Enseignement :** réduire le volume cumulé alloué ne garantit pas une réduction
+du temps CPU ni du pic de mémoire.
+
+**Retour arrière :** aucun revert effectué à ce stade. La version et ses
+résultats sont conservés pour la comparaison ; la variante reste à implémenter
+et à mesurer avant de décider de la version à retenir.
+
+### Autres pistes à explorer
 
 > **Tentative :** …
 > - **Hypothèse initiale :** …
