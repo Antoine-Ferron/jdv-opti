@@ -10,37 +10,74 @@ import (
 	"fmt"
 	"testing"
 
-	_ "gol/internal/engines"
-	"gol/internal/life"
+	_ "gol-wildfire/internal/engines"
+	"gol-wildfire/internal/fire"
 )
 
 var sizes = []int{256, 1024, 2048}
 
-// BenchmarkStep mesure le coût d'une génération (le cœur du hot path).
+// Deux régimes très différents, et une implémentation peut gagner sur l'un en
+// perdant sur l'autre : c'est justement ce qu'on veut voir.
+//
+//	front       — un seul foyer sur une grande carte : presque rien ne brûle,
+//	              le balayage intégral de la grille domine tout le reste.
+//	embrasement — beaucoup de foyers et une mise en régime préalable : la carte
+//	              est saturée, ce sont la localité mémoire et la bande passante
+//	              qui décident.
+var scenarios = []struct {
+	nom     string
+	foyers  int
+	chauffe int
+}{
+	{"front", 1, 0},
+	{"embrasement", 64, 50},
+}
+
+func carte(n, foyers int) fire.Map {
+	cfg := fire.DefaultConfig(n, n, 42)
+	cfg.Fires = foyers
+	return fire.Generate(cfg)
+}
+
+func chauffe(e fire.Engine, tours int) fire.Engine {
+	for i := 0; i < tours; i++ {
+		e.Step()
+	}
+	return e
+}
+
+// BenchmarkStep mesure le coût d'un tour (le cœur du hot path).
+//
+// L'état dérive d'une itération à l'autre : l'incendie s'étend, puis atteint son
+// régime. La mesure reste comparable entre implémentations puisqu'elles partent toutes
+// de la même carte et de la même graine, mais elle n'est pas une moyenne sur un
+// régime stationnaire : c'est BenchmarkRun qui mesure un scénario borné.
 func BenchmarkStep(b *testing.B) {
-	for _, impl := range life.Names() {
-		f, _ := life.Get(impl)
-		for _, n := range sizes {
-			b.Run(fmt.Sprintf("impl=%s/size=%d", impl, n), func(b *testing.B) {
-				e := f(n, n, life.RandomCells(n, n, 42, 0.3))
-				b.ReportAllocs()
-				b.SetBytes(int64(n * n)) // débit exprimé en cellules/s (1 "octet" = 1 cellule)
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					e.Step()
-				}
-			})
+	for _, impl := range fire.Names() {
+		f, _ := fire.Get(impl)
+		for _, s := range scenarios {
+			for _, n := range sizes {
+				b.Run(fmt.Sprintf("impl=%s/scenario=%s/size=%d", impl, s.nom, n), func(b *testing.B) {
+					e := chauffe(f(carte(n, s.foyers)), s.chauffe)
+					b.ReportAllocs()
+					b.SetBytes(int64(n * n)) // débit exprimé en cases/s
+					b.ResetTimer()
+					for i := 0; i < b.N; i++ {
+						e.Step()
+					}
+				})
+			}
 		}
 	}
 }
 
-// BenchmarkFingerprint mesure le coût de l'empreinte (détection de cycles).
+// BenchmarkFingerprint mesure le coût de l'empreinte.
 func BenchmarkFingerprint(b *testing.B) {
-	for _, impl := range life.Names() {
-		f, _ := life.Get(impl)
+	for _, impl := range fire.Names() {
+		f, _ := fire.Get(impl)
 		n := 1024
 		b.Run(fmt.Sprintf("impl=%s/size=%d", impl, n), func(b *testing.B) {
-			e := f(n, n, life.RandomCells(n, n, 42, 0.3))
+			e := chauffe(f(carte(n, 64)), 50)
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -50,20 +87,20 @@ func BenchmarkFingerprint(b *testing.B) {
 	}
 }
 
-// BenchmarkRun mesure un scénario complet (Step + détection de cycles).
+// BenchmarkRun mesure un scénario complet et borné : construction du moteur
+// comprise, nombre de tours fixe, donc parfaitement reproductible.
 func BenchmarkRun(b *testing.B) {
-	for _, impl := range life.Names() {
-		f, _ := life.Get(impl)
-		n, gens := 512, 50
-		cells := life.RandomCells(n, n, 42, 0.3)
-		b.Run(fmt.Sprintf("impl=%s/size=%d", impl, n), func(b *testing.B) {
-			b.ReportAllocs()
-			for i := 0; i < b.N; i++ {
-				e := f(n, n, cells)
-				if _, err := life.Run(e, life.Options{Generations: gens, DetectCycles: true}); err != nil {
-					b.Fatal(err)
+	for _, impl := range fire.Names() {
+		f, _ := fire.Get(impl)
+		n, tours := 512, 50
+		for _, s := range scenarios {
+			m := carte(n, s.foyers)
+			b.Run(fmt.Sprintf("impl=%s/scenario=%s/size=%d", impl, s.nom, n), func(b *testing.B) {
+				b.ReportAllocs()
+				for i := 0; i < b.N; i++ {
+					fire.Run(f(m), fire.Options{Turns: tours})
 				}
-			}
-		})
+			})
+		}
 	}
 }

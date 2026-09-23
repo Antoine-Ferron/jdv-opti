@@ -4,7 +4,7 @@
 #
 # Usage : ./scripts/run_benchmarks.sh            (ou : make bench)
 # Paramètres surchargeables par variables d'environnement :
-#   IMPLS="naive flat"  SIZE=1024  GENS=50  WARMUP=3  RUNS=15  COUNT=10  BENCH=.
+#   IMPLS="naive flat"  SIZE=1024  TURNS=50  WARMUP=3  RUNS=15  COUNT=10  BENCH=.
 #
 # Chaque exécution produit un dossier results/<date>-<commit>/ à versionner :
 # ce sont les pièces à conviction du rapport.
@@ -12,7 +12,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 SIZE=${SIZE:-1024}
-GENS=${GENS:-50}
+TURNS=${TURNS:-50}
 WARMUP=${WARMUP:-3}
 RUNS=${RUNS:-15}
 COUNT=${COUNT:-10}
@@ -35,17 +35,17 @@ echo ">> [2/6] Tests de conformité (une version incorrecte n'est pas mesurée)"
 go test ./... >"$out/tests.txt"
 
 echo ">> [3/6] Compilation"
-go build -o bin/gol ./cmd/gol
-IMPLS=${IMPLS:-$(./bin/gol -list | tr '\n' ' ')}
+go build -o bin/wildfire ./cmd/wildfire
+IMPLS=${IMPLS:-$(./bin/wildfire -list | tr '\n' ' ')}
 echo "   Implémentations : $IMPLS"
 
 echo ">> [4/6] Micro-benchmarks Go (count=$COUNT, -benchmem)"
 go test ./internal/bench -run '^$' -bench "$BENCH" -benchmem -count "$COUNT" -timeout 0 | tee "$out/bench.txt"
 
-echo ">> [5/6] Hyperfine (warmup=$WARMUP, runs=$RUNS, grille ${SIZE}x${SIZE}, $GENS générations)"
+echo ">> [5/6] Hyperfine (warmup=$WARMUP, runs=$RUNS, carte ${SIZE}x${SIZE}, $TURNS tours)"
 cmds=()
 for impl in $IMPLS; do
-	cmds+=(-n "$impl" "./bin/gol -impl $impl -size $SIZE -gens $GENS -quiet")
+	cmds+=(-n "$impl" "./bin/wildfire -impl $impl -size $SIZE -turns $TURNS -fires 64 -quiet")
 done
 # -N : pas de shell intermédiaire (supprime le bruit du lancement de shell).
 hyperfine -N --warmup "$WARMUP" --runs "$RUNS" \

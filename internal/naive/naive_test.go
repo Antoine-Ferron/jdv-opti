@@ -4,15 +4,16 @@ import (
 	"testing"
 	"unsafe"
 
-	"gol/internal/life"
-	"gol/internal/lifetest"
+	"gol-wildfire/internal/fire"
+	"gol-wildfire/internal/firetest"
 )
 
-func TestConformance(t *testing.T) {
-	lifetest.Run(t, func(w, h int, c []bool) life.Engine { return New(w, h, c) })
+func TestConformite(t *testing.T) {
+	firetest.Run(t, func(m fire.Map) fire.Engine { return New(m) })
 }
 
-// TestSimLayout documente la taille de la struct (axe padding) : à citer dans le rapport.
+// TestSimLayout documente l'empreinte mémoire (axe padding) : à citer dans le rapport.
 func TestSimLayout(t *testing.T) {
-	t.Logf("unsafe.Sizeof(Sim{}) = %d octets", unsafe.Sizeof(Sim{}))
+	t.Logf("unsafe.Sizeof(Cell{}) = %d octets", unsafe.Sizeof(Cell{}))
+	t.Logf("unsafe.Sizeof(Sim{})  = %d octets", unsafe.Sizeof(Sim{}))
 }
