@@ -1,0 +1,7 @@
+ok  	gol-wildfire/cmd/web	(cached)
+?   	gol-wildfire/cmd/wildfire	[no test files]
+ok  	gol-wildfire/internal/bench	0.170s [no tests to run]
+?   	gol-wildfire/internal/engines	[no test files]
+ok  	gol-wildfire/internal/fire	(cached)
+?   	gol-wildfire/internal/firetest	[no test files]
+ok  	gol-wildfire/internal/naive	(cached)
