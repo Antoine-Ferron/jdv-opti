@@ -37,6 +37,29 @@ func serie(n, tours, periode int) []*snapshot.State {
 	return etats
 }
 
+// puits empêche le compilateur de supprimer un calcul dont le résultat ne
+// servirait à rien : sans lui, le banc mesurait 0,15 ns par case, soit moins
+// d'un cycle pour deux multiplications dépendantes — un chiffre impossible.
+var puits uint64
+
+// BenchmarkSnapshotEmpreinte chiffre le test que paie la déduplication à chaque
+// snapshot, qu'il en évite un ou non.
+//
+// C'est la moitié de l'inégalité qui décide de la rentabilité de l'étape I/O-5 :
+// le hachage doit coûter moins que l'écriture qu'il permet d'éviter. Sans ce
+// chiffre, le verdict du §3.3 ne serait pas reproductible.
+func BenchmarkSnapshotEmpreinte(b *testing.B) {
+	for _, n := range []int{128, 1024} {
+		s := snapshot.Capture(naive.New(fire.Generate(fire.DefaultConfig(n, n, 42))), 0)
+		b.Run(fmt.Sprintf("size=%d", n), func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				puits = s.Empreinte()
+			}
+		})
+	}
+}
+
 // BenchmarkSnapshotSerie mesure l'archivage d'une série entière, avec et sans
 // déduplication (étape I/O-5, hypothèse I/O-5 B).
 //

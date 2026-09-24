@@ -1233,6 +1233,23 @@ Le levier identifié, non mesuré : l'empreinte est un FNV-1a octet par octet, d
 case. Un hachage par mots de 64 bits irait plusieurs fois plus vite et pourrait renverser le verdict
 de `packed` — c'est la première chose à tenter si l'on veut rouvrir ce dossier.
 
+*Pourquoi une seconde empreinte plutôt que `fire.Engine.Fingerprint` ?* Parce que le §2.3 a établi
+que celle des moteurs coûte une vingtaine de millisecondes en 1024², pour 451 200 allocations : dix
+fois le prix du snapshot qu'elle servirait à éviter, ce qui condamnerait la déduplication avant même
+de l'essayer. `State.Empreinte` coûte 1,785 ms à la même taille, sans aucune allocation
+([banc](../results/935ffbc/x86-controle/empreinte.txt)). Ce n'est **pas** une optimisation de
+`Fingerprint`, qui reste inchangé : le défaut `[F6]` relève de l'axe CPU et demeure ouvert. C'est
+seulement la justification d'avoir écrit un hachage séparé pour un besoin interne à cet axe.
+
+*Un piège de mesure rencontré ici, à ajouter aux deux du §2.4.* La première version de ce banc
+écrivait `_ = s.Empreinte()` et annonçait 0,150 ms — sept fois moins que la valeur réelle. Le calcul
+était supprimé par le compilateur, son résultat ne servant à rien. Le chiffre absurde ne saute pas
+aux yeux ; c'est le **coût par case** qui trahit, à 0,15 ns, soit moins d'un cycle pour deux
+multiplications dépendantes — impossible. Avec un puits, le banc donne 1,70 ns par case, conforme à
+ce qu'on attend, et 27,50 µs en 128² qui recoupent exactement les ~27 µs déduits indépendamment du
+banc de séries. **Un banc dont le résultat n'est jamais lu ne mesure rien**, et la seule défense est
+de rapporter chaque temps à une grandeur physique avant de le croire.
+
 **Réserves.** La série est mesurée en 128² parce qu'elle est conservée en mémoire ; la période 24 et
 le tour d'entrée 429 sont propres à cette taille et à la graine 42. Rien ne garantit qu'une autre
 carte donne la même période — et c'est justement pourquoi la taille du cache ne peut pas être fixée
@@ -1353,38 +1370,6 @@ mesurée avant le format bit-packé, la déduplication aurait été un franc suc
 **Retour arrière :** aucun revert. Le code est conservé, désactivé par défaut et paramétrable : il
 divise par deux le temps des formats coûteux, et ces mesures documentent la condition exacte de sa
 rentabilité.
-
-### Gain spectaculaire et sans effet — le hachage d'état
-
-L'étape I/O-5 avait besoin d'une empreinte d'état bon marché et s'est écrit la sienne, sans passer
-par `fire.Engine.Fingerprint`. La comparaison des deux, à grille identique en 1024²
-([banc](../results/935ffbc/x86-controle/empreinte.txt)), est sans appel :
-
-| | Temps | Alloué | Allocations |
-|---|---:|---:|---:|
-| `Engine.Fingerprint` — `fmt.Sprintf` par case puis SHA-256 | 18,64 ms | 17,6 Mo | 451 229 |
-| `State.Empreinte` — FNV-1a | **0,150 ms** | **0 o** | **0** |
-
-Soit **×124**, et la disparition de 451 229 allocations par appel. C'est le défaut `[F6]` de la
-baseline, recopié à l'identique dans `flat` puis dans `counters` : les trois implémentations
-partagent ce code.
-
-**Et pourtant ce gain ne changerait rien au programme.** `Fingerprint` n'est appelé que par
-`internal/firetest`, pour comparer deux moteurs entre eux, et par les bancs. Il n'apparaît ni dans
-`fire.Run` ni dans le binaire : l'optimiser accélérerait la suite de conformité et déplacerait la
-ligne `BenchmarkFingerprint` d'un facteur 124, sans retirer une seule microseconde à une exécution
-réelle.
-
-C'est le piège du §2.4 sous un troisième visage, et le plus dangereux des trois, parce que le chiffre
-est énorme. Une ligne de benchmark qui bouge de ×124 dans un tableau de synthèse se lit comme un
-succès majeur ; elle ne mesurerait ici que du code que personne n'exécute. **Un gain ne vaut que
-rapporté à la fréquence d'appel de ce qu'il accélère**, et cette fréquence est nulle sur le chemin
-chronométré.
-
-**Décision :** `Fingerprint` n'est pas modifié. Le remplaçant existe, mesuré, dans
-`snapshot.State.Empreinte` ; si l'axe CPU s'en empare un jour, ce sera pour la lisibilité de la
-baseline et la vitesse de la suite de tests, et le rapport devra dire explicitement que le gain
-n'atteint pas le programme.
 
 ### Autres pistes à explorer
 
