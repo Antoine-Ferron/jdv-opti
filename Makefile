@@ -5,13 +5,20 @@ TURNS ?= 500
 FIRES ?= 64
 ADDR  ?= 127.0.0.1:8081
 BANC  ?= $(shell uname -s)-$(shell uname -m)
+COUNT ?= 10
 COMMIT := $(shell git log -1 --format=%h -- internal cmd go.mod Makefile scripts)
 PROF  := results/$(COMMIT)/$(BANC)/profiles
 
-.PHONY: help build test env bench quick demo web profile flame layout escape proto tools clean
+# Filtres des deux campagnes partielles. Les deux bancs doivent employer les
+# mêmes : des filtres divergents produisent des bench.txt qui n'ont plus les
+# mêmes lignes, et la comparaison A/B devient partielle sans qu'on le voie.
+BENCH_CPU ?= Step|Run|Fingerprint|New
+BENCH_IO  ?= Snapshot|Store
+
+.PHONY: help build test env bench bench-cpu bench-io quick demo web profile flame layout escape proto db db-stop tools clean
 
 help: ## Affiche cette aide
-	@grep -E '^[a-z]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-9s %s\n", $$1, $$2}'
+	@grep -E '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-10s %s\n", $$1, $$2}'
 
 build: ## Compile bin/wildfire
 	go build -o bin/wildfire ./cmd/wildfire
@@ -24,6 +31,17 @@ env: ## Décrit le banc d'essai (axe 1)
 
 bench: ## Campagne complète sur ce banc (BANC=, SIZE=, TURNS=) -> results/<commit>/<banc>/
 	BANC=$(BANC) SIZE=$(SIZE) TURNS=$(TURNS) ./scripts/run_benchmarks.sh
+
+bench-cpu: ## Campagne d'une étape moteur : saute les bancs de sérialisation
+	BANC=$(BANC) SIZE=$(SIZE) TURNS=$(TURNS) BENCH='$(BENCH_CPU)' ./scripts/run_benchmarks.sh
+
+# Pas de passe Hyperfine ici : le binaire n'écrit aucun snapshot et n'ouvre
+# aucune connexion sur le chemin chronométré, la mesurer ne dirait rien de
+# l'axe I/O. Les bancs PostgreSQL se sautent d'eux-mêmes sans `make db`.
+bench-io: ## Bancs de l'axe I/O seuls (sérialisation, base) -> bench-io.txt
+	@mkdir -p results/$(COMMIT)/$(BANC)
+	go test ./internal/bench -run '^$$' -bench '$(BENCH_IO)' -benchmem -count $(COUNT) -timeout 0 \
+		| tee results/$(COMMIT)/$(BANC)/bench-io.txt
 
 quick: build ## Exécution rapide d'une implémentation (IMPL=, SIZE=, TURNS=, FIRES=)
 	./bin/wildfire -impl $(IMPL) -size $(SIZE) -turns $(TURNS) -fires $(FIRES)
