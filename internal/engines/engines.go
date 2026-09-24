@@ -23,7 +23,7 @@ import (
 	_ "gol-wildfire/internal/naive"    // baseline — ne plus modifier après les mesures de référence
 	//                   //           La modification la moins coûteuse du lot, et le plus gros
 	//                   //           gisement encore ouvert sur le banc A.
-	// _ ".../ghost"     // étape 3 : bordure fantôme, plus aucun modulo — 7-9 % en saturé sur le
+	_ "gol-wildfire/internal/ghost" // étape 3 : bordure fantôme, plus aucun modulo — 7-9 % en saturé sur le
 	//                   //           banc A, 37-41 % sur le banc B, et RIEN en front (sans
 	//                   //           propagation, pas de modulo). Gardée à cette place pour deux
 	//                   //           raisons : elle prépare le bit-packing, qu'un enroulement
