@@ -1,0 +1,14 @@
+File: wildfire
+Build ID: a9aef5216d71ddbb5a268608579d7fe78f317208
+Type: cpu
+Time: 2026-09-24 09:23:32 CEST
+Duration: 1.94s, Total samples = 1.94s (100.18%)
+Showing nodes accounting for 1.94s, 100% of 1.94s total
+Showing top 6 nodes out of 7
+      flat  flat%   sum%        cum   cum%
+     1.33s 68.56% 68.56%      1.40s 72.16%  gol-wildfire/internal/flat.(*Sim).Step
+     0.54s 27.84% 96.39%      0.54s 27.84%  gol-wildfire/internal/flat.(*Sim).Burning
+     0.06s  3.09% 99.48%      0.06s  3.09%  runtime.memclrNoHeapPointers
+     0.01s  0.52%   100%      0.01s  0.52%  runtime.asyncPreempt
+         0     0%   100%      1.94s   100%  gol-wildfire/internal/fire.Run
+         0     0%   100%      1.94s   100%  main.main

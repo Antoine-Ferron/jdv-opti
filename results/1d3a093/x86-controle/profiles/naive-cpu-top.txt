@@ -1,0 +1,24 @@
+File: wildfire
+Build ID: ccd69aeac3f25f963898c7da19213322938c8441
+Type: cpu
+Time: 2026-09-24 09:21:36 CEST
+Duration: 7.64s, Total samples = 7.77s (101.69%)
+Showing nodes accounting for 7.65s, 98.46% of 7.77s total
+Dropped 35 nodes (cum <= 0.04s)
+Showing top 15 nodes out of 22
+      flat  flat%   sum%        cum   cum%
+     3.79s 48.78% 48.78%      7.41s 95.37%  gol-wildfire/internal/naive.(*Sim).Step
+     2.89s 37.19% 85.97%      2.89s 37.19%  gol-wildfire/internal/fire.Mod (inline)
+     0.39s  5.02% 90.99%      0.73s  9.40%  gol-wildfire/internal/fire.Map.WindAt (inline)
+     0.22s  2.83% 93.82%      0.22s  2.83%  gol-wildfire/internal/naive.(*Sim).Burning
+     0.20s  2.57% 96.40%      3.10s 39.90%  gol-wildfire/internal/fire.Map.At (inline)
+     0.08s  1.03% 97.43%      0.08s  1.03%  gol-wildfire/internal/fire.Terrain.Combustion (inline)
+     0.07s   0.9% 98.33%      0.07s   0.9%  runtime.procyieldAsm
+     0.01s  0.13% 98.46%      0.08s  1.03%  runtime.procyield (inline)
+         0     0% 98.46%      7.63s 98.20%  gol-wildfire/internal/fire.Run
+         0     0% 98.46%      7.63s 98.20%  main.main
+         0     0% 98.46%      0.13s  1.67%  runtime.gcBgMarkWorker
+         0     0% 98.46%      0.11s  1.42%  runtime.gcBgMarkWorker.func2
+         0     0% 98.46%      0.10s  1.29%  runtime.gcDrain
+         0     0% 98.46%      0.08s  1.03%  runtime.gcDrainMarkWorkerDedicated (inline)
+         0     0% 98.46%      7.63s 98.20%  runtime.main

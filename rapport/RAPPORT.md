@@ -424,6 +424,21 @@ allocations. Les allocations et le GC restent des hypothèses d'explication ; un
 exigerait des mesures complémentaires. Aucun seuil universel de gain ne peut en être déduit : la
 significativité sera évaluée sur les échantillons comparés, banc par banc.
 
+**Un benchmark peut mesurer autre chose que ce qu'il annonce.** `BenchmarkRun` reconstruit le moteur
+à chaque itération, quand le binaire ne le construit qu'une fois. Pour une implémentation qui alloue
+un millier de blocs à la construction, cette répétition domine la mesure : `BenchmarkRun/front/1024`
+annonçait un gain de **×3,4** pour `flat` là où le programme réel en donne **×1,12** (§3.1). Deux
+enseignements pour la suite :
+
+- **confronter tout gain spectaculaire d'un micro-benchmark au binaire complet** avant de l'écrire —
+  ici un simple `hyperfine` sur `./bin/wildfire` a suffi à ramener le facteur de 3,4 à 1,12 ;
+- se méfier des mesures dont le **coût d'installation** est du même ordre que le travail mesuré. Le
+  scénario `front` à 50 tours coûte ~110 ms quand construire `naive` en coûte 0,32 — sauf sous
+  pression du ramasse-miettes, où la facture devient tout autre.
+
+C'est ce qui a fait écarter `BenchmarkStep` en scénario front (§1.2) ; `BenchmarkRun` souffre du même
+travers sous une autre forme, et l'a caché plus longtemps parce que sa variance restait basse.
+
 ---
 
 ## 3. Journal d'optimisation — /5
@@ -551,6 +566,11 @@ Sur le banc A, la même mesure `Run` front donne 160,6 ms contre 161,1 ms : **au
 écart**. La même optimisation, le même benchmark, et un facteur 3,4 d'un banc à
 l'autre.
 
+> ⚠ **Le ×3,4 de la première ligne est un artefact de mesure, pas un gain.** Il
+> est conservé ici parce que c'est ce que le benchmark rapporte, mais la suite de
+> cette section établit qu'il ne décrit pas le comportement du programme. Le gain
+> réel en scénario front est de **×1,12**.
+
 **Une hypothèse posée puis réfutée.** L'échelonnement des gains — ×3,4 sur 50
 tours, +1,6 % sur un tour isolé, +0,3 % sur 500 tours — évoquait un coût fixe
 payé une seule fois, soit la construction du moteur : `naive` y fait 1026
@@ -566,15 +586,50 @@ intermédiaires s'alignent sur cette lecture — `Run` embrasement part de 64 fo
 et ne sature qu'en cours de route, d'où ses +11,6 % ; Hyperfine mesure 500 tours
 en régime saturé, d'où ses +0,3 %.
 
-L'explication mécanique reste à établir. La piste à instruire est celle du
-balayage d'application, qui parcourt toute la grille quel que soit le nombre de
-cases en feu : avec `[][]Cell`, il saute entre 1024 blocs dispersés ; avec une
-grille contiguë, il est séquentiel et le préchargement matériel opère. Quand
-beaucoup de cases brûlent, c'est la propagation vers les huit voisins qui domine,
-et elle est dispersée dans les deux implémentations. **Cette explication n'est pas
-prouvée** : la vérifier demande un profil `flat` sur les deux bancs, et une mesure
-de `Step` en scénario front — que le protocole actuel exclut pour cause de dérive
-d'état (§1.2).
+**Le profil a ensuite montré que la lecture ci-dessus était elle-même fausse.**
+Profils produits sur le banc B, commit `1d3a093`
+([naive](../results/1d3a093/x86-controle/profiles/naive-front50-cpu-top.txt),
+[flat](../results/1d3a093/x86-controle/profiles/flat-front50-cpu-top.txt)), dans
+les conditions exactes du benchmark — un foyer, 50 tours — sur une carte 4096²
+pour que la durée soit exploitable par l'échantillonneur :
+
+| | naive | flat |
+|---|---:|---:|
+| Total échantillonné | **1,71 s** | **1,94 s** |
+| `Step` | 1,27 s | 1,33 s |
+| `Burning` | 0,40 s | 0,54 s |
+| `fire.Mod` | absent du profil | absent du profil |
+
+`flat` y est **plus lent que `naive`**, et `fire.Mod` n'apparaît dans aucun des
+deux : avec un seul foyer, presque aucune case ne brûle, donc presque aucune
+propagation. Le temps est intégralement dans le balayage d'application et dans
+`Burning`.
+
+**D'où vient alors le ×3,4 ?** De `BenchmarkRun` lui-même, qui **reconstruit le
+moteur à chaque itération** — `naive` y refait 1076 allocations que le ramasse-
+miettes doit ensuite tracer pendant que la simulation continue d'allouer. Le
+binaire, lui, ne construit qu'une fois. Mesuré au CLI dans les mêmes conditions
+(1024², un foyer, 50 tours, Hyperfine `-N --warmup 3 --runs 12`) :
+
+| | naive | flat | Écart |
+|---|---:|---:|---:|
+| Processus complet | 900,3 ms ± 101,8 ms | 801,7 ms ± 8,9 ms | **×1,12** |
+| Écart-type | 101,8 ms | **8,9 ms** | ÷11 |
+
+`flat` mesuré au CLI (801,7 ms) et au benchmark (115,5 ms + génération) coïncide ;
+`naive` est **2,7 fois plus lent au benchmark qu'au CLI**. L'écart est donc
+entièrement imputable à la reconstruction répétée, que seul le benchmark impose.
+
+`BenchmarkNew` n'avait pas suffi à le voir : il mesure la construction **isolée**,
+en boucle serrée, où les objets sont recyclés immédiatement sans que le GC ait à
+les tracer. C'est une mesure juste qui répond à la mauvaise question.
+
+**Conclusion.** Le gain réel de `flat` est de **×1,12** sur le scénario front et
+nul en régime saturé. Son apport principal n'est pas la vitesse mais la
+**régularité** : l'écart-type passe de 101,8 ms à 8,9 ms, et le CV Hyperfine de
+2,5 % à 0,5 % sur le banc A. Une baseline qui n'alloue plus rend le banc lui-même
+plus fiable pour toutes les étapes suivantes — ce qui, vu la dispersion du banc de
+référence (§1.1, réserve 4), vaut mieux qu'un gain de quelques pour cent.
 
 ### 3.1 Mémoire & localité de cache
 

@@ -1,0 +1,16 @@
+File: wildfire
+Build ID: a9aef5216d71ddbb5a268608579d7fe78f317208
+Type: cpu
+Time: 2026-09-24 09:22:31 CEST
+Duration: 3.69s, Total samples = 3.85s (104.24%)
+Showing nodes accounting for 3.78s, 98.18% of 3.85s total
+Dropped 1 node (cum <= 0.02s)
+Showing top 7 nodes out of 26
+      flat  flat%   sum%        cum   cum%
+     2.01s 52.21% 52.21%      3.39s 88.05%  gol-wildfire/internal/naive.(*Sim).Step
+     1.04s 27.01% 79.22%      1.04s 27.01%  gol-wildfire/internal/fire.Mod (inline)
+     0.31s  8.05% 87.27%      0.31s  8.05%  gol-wildfire/internal/naive.(*Sim).Burning
+     0.18s  4.68% 91.95%      0.31s  8.05%  gol-wildfire/internal/fire.Map.WindAt (inline)
+     0.11s  2.86% 94.81%      1.15s 29.87%  gol-wildfire/internal/fire.Map.At (inline)
+     0.10s  2.60% 97.40%      0.10s  2.60%  runtime.procyieldAsm
+     0.03s  0.78% 98.18%      0.03s  0.78%  gol-wildfire/internal/fire.Terrain.Combustion (inline)

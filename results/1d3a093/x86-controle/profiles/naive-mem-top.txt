@@ -1,0 +1,15 @@
+File: wildfire
+Build ID: ccd69aeac3f25f963898c7da19213322938c8441
+Type: alloc_space
+Time: 2026-09-24 09:21:44 CEST
+Showing nodes accounting for 594.22MB, 99.11% of 599.58MB total
+Dropped 59 nodes (cum <= 3MB)
+      flat  flat%   sum%        cum   cum%
+     493MB 82.22% 82.22%      493MB 82.22%  gol-wildfire/internal/naive.(*Sim).Step
+      32MB  5.34% 87.56%       32MB  5.34%  gol-wildfire/internal/fire.champLisse
+   31.05MB  5.18% 92.74%    31.05MB  5.18%  gol-wildfire/internal/fire.quantile
+      24MB  4.00% 96.74%   103.22MB 17.22%  gol-wildfire/internal/fire.Generate
+   14.17MB  2.36% 99.11%    14.17MB  2.36%  gol-wildfire/internal/fire.tirage
+         0     0% 99.11%      493MB 82.22%  gol-wildfire/internal/fire.Run
+         0     0% 99.11%   599.51MB   100%  main.main
+         0     0% 99.11%   599.51MB   100%  runtime.main
