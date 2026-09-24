@@ -1109,11 +1109,51 @@ des allers-retours réseau.
 **Conséquence pratique :** le banc B reste sous WSL2. Pour cet axe, ce n'est pas un compromis imposé
 par l'outillage, c'est le meilleur des deux environnements disponibles.
 
+#### Étape I/O-5 — cache et réemploi *(hypothèses posées avant l'implémentation)*
+
+Point de départ mesuré, banc B en 1024²
+([benchstat](../results/ae8b974/x86-controle/benchstat.txt)) :
+
+| Format | Temps | Alloué par snapshot | Allocations |
+|---|---:|---:|---:|
+| `packed` | 1,338 ms | 1,500 Mio | 3 |
+| `proto`  | 13,84 ms | 20,01 Mio | 6 |
+| `json`   | 534,7 ms | 1,092 Gio | 65 |
+
+Les allocations sont identifiées et peu nombreuses : `packed` alloue son en-tête, le décor (1 Mio)
+et l'état (512 Kio) ; `proto` alloue quatre `[]uint32` de 4 Mio plus le tampon de `Marshal`. Ce sont
+des tampons **volumineux, de taille constante et rendus immédiatement** — le cas d'école de
+`sync.Pool`.
+
+> **Hypothèse C — le réemploi de tampons.** Un `sync.Pool` ramènera les allocations par snapshot à
+> ~0 en régime établi : c'est mécanique, et ce n'est pas la question intéressante. La question est
+> le **temps**. Le coût évité est celui de la mise à zéro des tampons neufs — Go garantit une
+> mémoire nulle à l'allocation — et du travail du ramasse-miettes sur 1,5 Mio à 20 Mio de déchets
+> par snapshot. Rapporté à la bande passante mémoire, remettre à zéro 1,5 Mio représente une
+> fraction faible des 1,338 ms de `packed`. **Gain attendu : quelques pour cent, pas un ordre de
+> grandeur** — et possiblement nul.
+> **Précédent qui impose la prudence :** l'étape 1 a atteint zéro allocation par `Step` et a
+> pourtant *régressé* de 0,9 % (§4). Réduire le volume alloué ne réduit pas mécaniquement le temps.
+> **Vérification :** benchmark avec et sans pool, par format et par taille, `-benchmem` ;
+> l'hypothèse est réfutée si l'écart de temps n'est pas significatif alors que les allocations
+> tombent bien à zéro.
+
+> **Hypothèse D — la déduplication des snapshots.** Quand le feu s'éteint, l'état devient un point
+> fixe : tous les snapshots suivants sont identiques. Ne pas réécrire un état d'empreinte déjà vue
+> supprime donc non pas le coût d'un tampon, mais **la sérialisation et l'écriture entières**.
+> **Gain attendu : bien supérieur à celui de l'hypothèse C**, et proportionnel à la part de la
+> simulation passée après extinction — nul, en revanche, dans un scénario qui brûle jusqu'au bout.
+> **Vérification :** taux de réussite du cache mesuré sur une exécution réelle, et non supposé.
+
+Sous-question de l'hypothèse D, qui décide de la structure de données : **un cache d'une seule
+entrée suffit-il ?** Un point fixe est un cycle de période 1 ; il est entièrement capté en
+comparant à la dernière empreinte. Un LRU n'apporte quelque chose que s'il existe des cycles de
+période supérieure. La structure retenue sera celle que la mesure justifie : si une entrée capte
+tous les doublons observés, le LRU est de la complexité sans contrepartie, et sera écarté au §4.
+
 #### À venir
 
-- **Cache** : `sync.Pool` sur les tampons de sérialisation, et LRU des empreintes déjà vues. À
-  mesurer et non à supposer : un pool inutile augmente la pression mémoire au lieu de la réduire,
-  et ferait un bon candidat pour le §4.
+- Rien au-delà de I/O-5 pour cet axe.
 
 ---
 
