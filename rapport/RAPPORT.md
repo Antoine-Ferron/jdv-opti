@@ -972,9 +972,36 @@ rapporte environ 81,06 Mo, surtout dans Generate. Ce profil échantillonné ne
 permet pas de conclure à une mémoire totale identique à counters : les mesures
 B/op exposent bien le surcoût de construction.
 
-**Banc B et portabilité : en attente.** Aucun dossier x86 n'est présent pour
-`a4c0483`. Comparer les ratios ghost/counters au même commit et avec le même
-filtre `make bench-cpu` ; le gain x86 supérieur envisagé reste une hypothèse.
+**Résultat banc B — l'hypothèse de portabilité est confirmée, et largement.**
+Même commit, même filtre `make bench-cpu`. Sources :
+[Hyperfine](../results/a4c0483/x86-controle/hyperfine-stats.md),
+[benchstat](../results/a4c0483/x86-controle/benchstat.txt),
+[profil](../results/a4c0483/x86-controle/profiles/ghost-cpu-top.txt).
+
+| 1024², 64 foyers, 500 tours | `counters` | `ghost` | Gain |
+|---|---:|---:|---:|
+| Banc A — M1 | 6,0687 s | 5,1173 s | ×1,186 |
+| Banc B — x86 | 7,8671 s | **4,5955 s** | **×1,712** |
+
+C'est le premier gain majeur du projet, et **le plus dépendant de l'architecture** : ×1,71 d'un
+côté contre ×1,19 de l'autre. Le microbenchmark concorde — `Step` en embrasement 1024² passe de
+12,228 ms à 7,860 ms, soit −35,7 % (p < 0,001).
+
+Le profil donne le mécanisme sans ambiguïté. Sur le banc B, `fire.Mod` occupait **42,50 %** du
+profil de `counters` ; dans celui de `ghost` il a **entièrement disparu**, `Step` absorbant 95,98 %
+des échantillons. Retirer 42,5 % du profil rend 41,6 % du temps : le rapport est de un pour un, ce
+qui est aussi net qu'un lien de cause à effet puisse l'être dans ce rapport.
+
+Sur le banc A, `Mod` ne pesait que 7,43 % pour un gain de 15,7 % — soit **deux fois plus que ce que
+le seul modulo pouvait rendre**. La bordure fantôme y supprime donc autre chose en plus,
+vraisemblablement des tests de bornes et des calculs d'indices ; aucune mesure ne l'établit ici.
+
+La régression en front se confirme aussi sur le banc B : 779,2 ± 9,8 ms pour `ghost` contre
+772,8 ± 11,9 ms pour `counters`, soit 0,8 % de plus, dans le bruit. Sans propagation, il n'y a pas
+de modulo à supprimer et il reste un halo à entretenir — exactement ce que `engines.go` annonçait.
+
+**Réserve :** le CV de `ghost` atteint 2,5 % sur le banc B, au-dessus du seuil de 2 % du §1.2. Vu
+l'ampleur du gain, il ne remet pas la conclusion en cause, mais le ×1,712 est à lire à ±3 % près.
 
 **Décision :** conserver cette variante comme étape favorable au régime saturé,
 avec sa régression en front explicitement documentée au §4. Aucun remplacement
