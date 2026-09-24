@@ -2,8 +2,11 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // La requête d'analyse mesurée : retrouver les tours dont l'empreinte se répète.
@@ -72,8 +75,11 @@ func (s *Store) Interroge(ctx context.Context, fingerprint uint64) (int, error) 
 	var empreinte int64
 	var occurrences int
 	err := s.pool.QueryRow(ctx, RequeteAnalyse, int64(fingerprint)).Scan(&empreinte, &occurrences)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, nil // l'empreinte n'apparaît pas : ce n'est pas une erreur
+	}
 	if err != nil {
-		return 0, nil // aucune ligne : l'empreinte n'apparaît pas, ce n'est pas une erreur
+		return 0, err
 	}
 	return occurrences, nil
 }

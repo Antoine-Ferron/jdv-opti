@@ -30,10 +30,17 @@ func base(b *testing.B) (context.Context, *store.Store) {
 	return ctx, s
 }
 
-func lignes(n int) []store.Turn {
+// lignes engendre n tours. modulo = 0 donne des empreintes uniques, une valeur
+// k les fait se répéter une fois sur k. Voir BenchmarkStoreRequete : cette
+// distribution pèse plus lourd sur le plan d'exécution que le volume.
+func lignes(n, modulo int) []store.Turn {
 	out := make([]store.Turn, n)
 	for i := range out {
-		out[i] = store.Turn{Turn: i, Fingerprint: uint64(i % 10), Burning: i * 3, Burned: i * 7}
+		f := uint64(i)
+		if modulo > 0 {
+			f = uint64(i % modulo)
+		}
+		out[i] = store.Turn{Turn: i, Fingerprint: f, Burning: i * 3, Burned: i * 7}
 	}
 	return out
 }
@@ -50,7 +57,7 @@ func BenchmarkStoreInsertion(b *testing.B) {
 	// 500 tours, la longueur d'une campagne, et 5 000 pour vérifier que l'écart
 	// suit bien le nombre d'allers-retours et non le volume transmis.
 	for _, n := range []int{500, 5000} {
-		lot := lignes(n)
+		lot := lignes(n, 0)
 		for _, cas := range []struct {
 			nom    string
 			insere func(context.Context, int64, []store.Turn) error
@@ -85,46 +92,61 @@ func BenchmarkStoreInsertion(b *testing.B) {
 	}
 }
 
-// BenchmarkStoreRequete mesure la requête d'analyse sans puis avec index, à
-// plusieurs volumes.
+// BenchmarkStoreRequete mesure la requête d'analyse sans puis avec index, en
+// croisant deux dimensions : le volume de la table et la distribution des
+// empreintes.
 //
-// Le balayage des volumes est l'objet même du banc : un index n'est pas
-// gratuit, et l'hypothèse à réfuter est qu'il rapporte quelque chose à toutes
-// les tailles. Sur une table de quelques centaines de lignes, un parcours
-// séquentiel tient dans une poignée de pages et le détour par l'index peut
-// coûter plus qu'il ne rapporte.
+// La seconde dimension n'était pas prévue. Elle a été ajoutée après une mesure
+// qui contredisait l'hypothèse A : sur 20 000 lignes, l'index *allongeait* la
+// requête. Le plan l'expliquait — avec une empreinte répétée une fois sur dix,
+// le prédicat retient 10 % de la table, PostgreSQL doit de toute façon visiter
+// presque toutes les pages, et le détour par l'index s'ajoute au parcours au
+// lieu de l'éviter.
+//
+// Les deux distributions sont donc conservées : « unique » est le cas réel, où
+// une empreinte répétée signale un cycle ; « repetee » est le contre-exemple
+// qui montre qu'un index ne se juge pas au nombre de lignes mais à la
+// sélectivité du prédicat.
 func BenchmarkStoreRequete(b *testing.B) {
 	ctx, s := base(b)
-	for _, n := range []int{200, 20_000, 500_000} {
-		if err := s.Reset(ctx); err != nil {
-			b.Fatal(err)
-		}
-		run, err := s.NewRun(ctx, "bench", 1024, 1024, 42)
-		if err != nil {
-			b.Fatal(err)
-		}
-		if err := s.CopyTurns(ctx, run, lignes(n)); err != nil {
-			b.Fatal(err)
-		}
-
-		for _, cas := range []struct {
-			nom     string
-			prepare func(context.Context) error
-		}{
-			{"sans-index", s.DropIndex},
-			{"avec-index", s.AddIndex},
-		} {
-			if err := cas.prepare(ctx); err != nil {
+	for _, dist := range []struct {
+		nom    string
+		modulo int
+	}{
+		{"unique", 0},
+		{"repetee", 10},
+	} {
+		for _, n := range []int{200, 20_000, 500_000} {
+			if err := s.Reset(ctx); err != nil {
 				b.Fatal(err)
 			}
-			b.Run(fmt.Sprintf("index=%s/lignes=%d", cas.nom, n), func(b *testing.B) {
-				b.ReportAllocs()
-				for i := 0; i < b.N; i++ {
-					if _, err := s.Interroge(ctx, 3); err != nil {
-						b.Fatal(err)
-					}
+			run, err := s.NewRun(ctx, "bench", 1024, 1024, 42)
+			if err != nil {
+				b.Fatal(err)
+			}
+			if err := s.CopyTurns(ctx, run, lignes(n, dist.modulo)); err != nil {
+				b.Fatal(err)
+			}
+
+			for _, cas := range []struct {
+				nom     string
+				prepare func(context.Context) error
+			}{
+				{"sans-index", s.DropIndex},
+				{"avec-index", s.AddIndex},
+			} {
+				if err := cas.prepare(ctx); err != nil {
+					b.Fatal(err)
 				}
-			})
+				b.Run(fmt.Sprintf("index=%s/empreintes=%s/lignes=%d", cas.nom, dist.nom, n), func(b *testing.B) {
+					b.ReportAllocs()
+					for i := 0; i < b.N; i++ {
+						if _, err := s.Interroge(ctx, 3); err != nil {
+							b.Fatal(err)
+						}
+					}
+				})
+			}
 		}
 	}
 	if err := s.DropIndex(ctx); err != nil {

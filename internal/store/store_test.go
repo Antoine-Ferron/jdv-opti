@@ -40,12 +40,21 @@ func ouvre(t *testing.T) *store.Store {
 	return s
 }
 
-func tours(n int) []store.Turn {
+// tours engendre n lignes. modulo contrôle la distribution des empreintes :
+// 0 les rend uniques, comme dans une vraie exécution où deux tours identiques
+// signalent un cycle ; une valeur k les fait se répéter une fois sur k.
+//
+// Cette distribution n'est pas un détail de jeu d'essai : elle décide du plan
+// d'exécution. Un prédicat qui retient 10 % de la table ne justifie aucun index,
+// quel que soit le nombre de lignes.
+func tours(n, modulo int) []store.Turn {
 	out := make([]store.Turn, n)
 	for i := range out {
-		// Une empreinte sur dix se répète : la requête d'analyse doit avoir
-		// quelque chose à trouver, et l'index quelque chose à filtrer.
-		out[i] = store.Turn{Turn: i, Fingerprint: uint64(i % 10), Burning: i * 3, Burned: i * 7}
+		f := uint64(i)
+		if modulo > 0 {
+			f = uint64(i % modulo)
+		}
+		out[i] = store.Turn{Turn: i, Fingerprint: f, Burning: i * 3, Burned: i * 7}
 	}
 	return out
 }
@@ -65,7 +74,7 @@ func TestInsertionsEquivalentes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	lignes := tours(50)
+	lignes := tours(50, 10)
 	if err := s.InsertTurns(ctx, unitaire, lignes); err != nil {
 		t.Fatalf("insertion unitaire : %v", err)
 	}
@@ -92,6 +101,10 @@ func TestInsertionsEquivalentes(t *testing.T) {
 
 // L'index doit changer le plan d'exécution, pas seulement le temps : c'est le
 // passage de Seq Scan à Index Scan qui est la preuve attendue au §3.3.
+//
+// Empreintes uniques, comme dans une vraie exécution : c'est la seule
+// distribution pour laquelle un index a un sens, et donc la seule dont le
+// changement de plan démontre quelque chose.
 func TestIndexChangeLePlan(t *testing.T) {
 	ctx := context.Background()
 	s := ouvre(t)
@@ -100,7 +113,7 @@ func TestIndexChangeLePlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CopyTurns(ctx, run, tours(20000)); err != nil {
+	if err := s.CopyTurns(ctx, run, tours(20000, 0)); err != nil {
 		t.Fatal(err)
 	}
 
