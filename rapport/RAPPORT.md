@@ -893,6 +893,57 @@ uniques, une répétition signalant un cycle de la simulation.
 Les allocations côté client sont constantes (7 par requête, ~483 o), ce qui confirme que la mesure
 porte bien sur la base et non sur le pilote.
 
+##### Contrôle d'environnement — d'où vient le plancher ?
+
+Le plancher de 147 µs porte une conclusion (§4), il fallait donc vérifier d'où il vient. Le banc B
+tourne sous WSL2 et parle à un conteneur Docker Desktop : l'aller-retour traverse une frontière de
+virtualisation. Hypothèse posée avant la mesure : **ce détour gonfle le plancher, et une exécution
+native le ferait baisser.**
+
+La même campagne a donc été rejouée depuis Windows natif, contre **le même conteneur** — seul le
+chemin client → serveur change ([env.md](../results/8a71072/x86-windows/env.md),
+[benchstat-wsl-vs-windows.txt](../results/8a71072/x86-windows/benchstat-wsl-vs-windows.txt)).
+
+**L'hypothèse est réfutée, et dans le mauvais sens : le natif est plus lent.**
+
+| Mesure | WSL2 (banc B) | Windows natif | Écart |
+|---|---|---|---|
+| Plancher de requête (200 lignes, sans index) | 147,5 µs | 221,8 µs | **+50 %** |
+| Requête à 500 000 lignes, avec index | 176,5 µs | 313,7 µs | +78 % |
+| 500 insertions unitaires | 83,35 ms | 126,45 ms | +52 % |
+| 500 insertions par `COPY` | 6,565 ms | 14,582 ms | +122 % |
+
+Tous ces écarts sont significatifs (p = 0,002, n = 6). L'explication la plus probable — non
+instrumentée, donc donnée comme telle — est que le moteur Docker tourne dans une machine virtuelle
+Linux : depuis WSL2, autre machine virtuelle du même hôte Hyper-V, le trafic reste entre invités,
+tandis que depuis Windows il passe par le mandataire de publication de ports de Docker Desktop.
+
+**Ce que ce contrôle démontre, en revanche, c'est la nature du plancher.** `EXPLAIN ANALYZE` mesure
+le temps *côté serveur* : il donne 0,033 ms pour l'`Index Only Scan` dans les **deux**
+environnements. Le serveur fait exactement le même travail ; toute la différence est du transport.
+Et le plancher se propage mécaniquement au gain de l'index :
+
+| | Plancher | Requête 500 000 lignes avec index | Gain de l'index à 500 000 |
+|---|---|---|---|
+| WSL2    | 147,5 µs | 176,5 µs | **×46,8** |
+| Windows | 221,8 µs | 313,7 µs | **×29,4** |
+
+Dans les deux cas, l'index ramène la requête à l'ordre du plancher, et le gain maximal atteignable
+est d'autant plus faible que le plancher est haut. **Le gain d'un index est borné par un coût qui
+n'a rien à voir avec l'index** — c'est la conclusion du §4, ici vérifiée par une seconde voie.
+
+Deux réserves, qui écartent des chiffres plutôt qu'elles ne les nuancent. D'abord, les deux
+campagnes n'ont pas tourné au même instant : l'état du cache du serveur n'est pas contrôlé entre
+elles. Seules les mesures **dominées par le transport** sont donc comparables. C'est vérifiable dans
+les données : plus une mesure est dominée par le travail du serveur, plus l'écart se referme
+(+11,5 % pour le `Seq Scan` sur 500 000 lignes), jusqu'à devenir non significatif ou s'inverser sur
+les deux cas les plus serveur-intensifs (empreintes répétées à 500 000 lignes). Ces deux cellules ne
+sont pas exploitées. Ensuite, ce contrôle ne dit rien des mesures CPU du §2 : il ne porte que sur
+des allers-retours réseau.
+
+**Conséquence pratique :** le banc B reste sous WSL2. Pour cet axe, ce n'est pas un compromis imposé
+par l'outillage, c'est le meilleur des deux environnements disponibles.
+
 #### À venir
 
 - **Cache** : `sync.Pool` sur les tampons de sérialisation, et LRU des empreintes déjà vues. À
@@ -943,6 +994,12 @@ ignorait. Une requête sur 200 lignes coûte 147 µs sans index, alors qu'il n'y
 ce temps est celui de l'aller-retour client/serveur. La mesure d'insertion, indépendante, donne
 167 µs par requête — même grandeur. À 500 000 lignes, l'index ramène la requête à 176,5 µs, soit ce
 plancher : le gain ne peut pas croître au-delà.
+
+**Confirmation par une seconde voie :** la campagne rejouée depuis Windows natif (§3.3) donne un
+plancher plus haut — 221,8 µs au lieu de 147,5 — et, mécaniquement, un gain d'index plus faible au
+même volume : ×29,4 au lieu de ×46,8. Le serveur, lui, fait le même travail dans les deux cas
+(`Index Only Scan` à 0,033 ms d'après `EXPLAIN ANALYZE`). Le plafond du gain est donc bien fixé par
+le coût de transport, et non par la base.
 
 **Enseignement :** raisonner en ordre de grandeur sur le seul volume de données conduit à annoncer
 un seuil faux. Un gain relatif se borne toujours à ce que le coût incompressible laisse disponible,

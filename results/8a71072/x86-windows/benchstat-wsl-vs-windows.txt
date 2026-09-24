@@ -1,0 +1,71 @@
+pkg: gol-wildfire/internal/bench
+cpu: Intel(R) Core(TM) Ultra 9 275HX
+                                                                  │     wsl      │                windows                │
+                                                                  │    sec/op    │    sec/op      vs base                │
+StoreInsertion/mode=unitaire/tours=500-24                           83.35m ± 11%   126.45m ± 25%   +51.71% (p=0.002 n=6)
+StoreInsertion/mode=copy/tours=500-24                               6.565m ± 16%   14.582m ± 28%  +122.10% (p=0.002 n=6)
+StoreInsertion/mode=unitaire/tours=5000-24                           1.033 ± 12%     1.259 ±  3%   +21.86% (p=0.002 n=6)
+StoreInsertion/mode=copy/tours=5000-24                              54.38m ±  5%    88.17m ±  8%   +62.13% (p=0.002 n=6)
+StoreRequete/index=sans-index/empreintes=unique/lignes=200-24       147.5µ ±  2%    221.8µ ±  3%   +50.36% (p=0.002 n=6)
+StoreRequete/index=avec-index/empreintes=unique/lignes=200-24       148.3µ ±  3%    215.0µ ± 11%   +45.02% (p=0.002 n=6)
+StoreRequete/index=sans-index/empreintes=unique/lignes=20000-24     601.8µ ±  3%    725.0µ ± 16%   +20.48% (p=0.002 n=6)
+StoreRequete/index=avec-index/empreintes=unique/lignes=20000-24     153.9µ ±  7%    272.1µ ± 22%   +76.83% (p=0.002 n=6)
+StoreRequete/index=sans-index/empreintes=unique/lignes=500000-24    8.257m ±  2%    9.208m ±  1%   +11.51% (p=0.002 n=6)
+StoreRequete/index=avec-index/empreintes=unique/lignes=500000-24    176.5µ ±  5%    313.7µ ±  5%   +77.78% (p=0.002 n=6)
+StoreRequete/index=sans-index/empreintes=repetee/lignes=200-24      160.1µ ±  4%    284.9µ ± 23%   +77.98% (p=0.002 n=6)
+StoreRequete/index=avec-index/empreintes=repetee/lignes=200-24      160.9µ ±  4%    287.8µ ±  3%   +78.88% (p=0.002 n=6)
+StoreRequete/index=sans-index/empreintes=repetee/lignes=20000-24    635.7µ ±  2%    774.4µ ± 14%   +21.83% (p=0.002 n=6)
+StoreRequete/index=avec-index/empreintes=repetee/lignes=20000-24    300.9µ ±  2%    478.5µ ±  8%   +59.01% (p=0.002 n=6)
+StoreRequete/index=sans-index/empreintes=repetee/lignes=500000-24   8.776m ±  1%    7.915m ± 17%         ~ (p=0.065 n=6)
+StoreRequete/index=avec-index/empreintes=repetee/lignes=500000-24   4.567m ±  2%    1.346m ±  4%   -70.53% (p=0.002 n=6)
+geomean                                                             1.844m          2.460m         +33.40%
+
+                                           │     wsl     │               windows               │
+                                           │  tours/op   │  tours/op    vs base                │
+StoreInsertion/mode=unitaire/tours=500-24     500.0 ± 0%    500.0 ± 0%       ~ (p=1.000 n=6) ¹
+StoreInsertion/mode=copy/tours=500-24         500.0 ± 0%    500.0 ± 0%       ~ (p=1.000 n=6) ¹
+StoreInsertion/mode=unitaire/tours=5000-24   5.000k ± 0%   5.000k ± 0%       ~ (p=1.000 n=6) ¹
+StoreInsertion/mode=copy/tours=5000-24       5.000k ± 0%   5.000k ± 0%       ~ (p=1.000 n=6) ¹
+geomean                                      1.581k        1.581k       +0.00%
+¹ all samples are equal
+
+                                                                  │     wsl      │              windows               │
+                                                                  │     B/op     │     B/op      vs base              │
+StoreInsertion/mode=unitaire/tours=500-24                           114.2Ki ± 0%   114.1Ki ± 0%       ~ (p=0.240 n=6)
+StoreInsertion/mode=copy/tours=500-24                               175.6Ki ± 1%   175.2Ki ± 1%       ~ (p=0.310 n=6)
+StoreInsertion/mode=unitaire/tours=5000-24                          1.184Mi ± 0%   1.184Mi ± 0%       ~ (p=0.567 n=6)
+StoreInsertion/mode=copy/tours=5000-24                              970.5Ki ± 1%   961.1Ki ± 1%  -0.97% (p=0.041 n=6)
+StoreRequete/index=sans-index/empreintes=unique/lignes=200-24         483.5 ± 0%     484.0 ± 0%       ~ (p=0.364 n=6)
+StoreRequete/index=avec-index/empreintes=unique/lignes=200-24         484.0 ± 0%     484.0 ± 0%       ~ (p=0.273 n=6)
+StoreRequete/index=sans-index/empreintes=unique/lignes=20000-24       482.0 ± 0%     487.5 ± 1%  +1.14% (p=0.006 n=6)
+StoreRequete/index=avec-index/empreintes=unique/lignes=20000-24       484.0 ± 0%     484.0 ± 0%       ~ (p=0.545 n=6)
+StoreRequete/index=sans-index/empreintes=unique/lignes=500000-24      478.5 ± 8%     510.0 ± 2%  +6.58% (p=0.041 n=6)
+StoreRequete/index=avec-index/empreintes=unique/lignes=500000-24      484.0 ± 0%     484.0 ± 0%       ~ (p=0.318 n=6)
+StoreRequete/index=sans-index/empreintes=repetee/lignes=200-24        483.5 ± 0%     484.0 ± 0%       ~ (p=0.076 n=6)
+StoreRequete/index=avec-index/empreintes=repetee/lignes=200-24        483.0 ± 0%     484.0 ± 0%       ~ (p=0.152 n=6)
+StoreRequete/index=sans-index/empreintes=repetee/lignes=20000-24      483.5 ± 0%     485.5 ± 1%       ~ (p=0.067 n=6)
+StoreRequete/index=avec-index/empreintes=repetee/lignes=20000-24      483.5 ± 0%     485.0 ± 0%  +0.31% (p=0.041 n=6)
+StoreRequete/index=sans-index/empreintes=repetee/lignes=500000-24     480.5 ± 4%     495.5 ± 2%  +3.12% (p=0.019 n=6)
+StoreRequete/index=avec-index/empreintes=repetee/lignes=500000-24     480.0 ± 1%     488.5 ± 1%  +1.77% (p=0.006 n=6)
+geomean                                                             2.530Ki        2.550Ki       +0.76%
+
+                                                                  │     wsl     │               windows               │
+                                                                  │  allocs/op  │  allocs/op   vs base                │
+StoreInsertion/mode=unitaire/tours=500-24                           3.989k ± 0%   3.989k ± 0%       ~ (p=1.000 n=6)
+StoreInsertion/mode=copy/tours=500-24                               3.030k ± 0%   3.031k ± 0%  +0.03% (p=0.032 n=6)
+StoreInsertion/mode=unitaire/tours=5000-24                          49.02k ± 0%   49.02k ± 0%       ~ (p=1.000 n=6) ¹
+StoreInsertion/mode=copy/tours=5000-24                              39.04k ± 0%   39.05k ± 0%  +0.01% (p=0.006 n=6)
+StoreRequete/index=sans-index/empreintes=unique/lignes=200-24        7.000 ± 0%    7.000 ± 0%       ~ (p=1.000 n=6) ¹
+StoreRequete/index=avec-index/empreintes=unique/lignes=200-24        7.000 ± 0%    7.000 ± 0%       ~ (p=1.000 n=6) ¹
+StoreRequete/index=sans-index/empreintes=unique/lignes=20000-24      7.000 ± 0%    7.000 ± 0%       ~ (p=1.000 n=6) ¹
+StoreRequete/index=avec-index/empreintes=unique/lignes=20000-24      7.000 ± 0%    7.000 ± 0%       ~ (p=1.000 n=6) ¹
+StoreRequete/index=sans-index/empreintes=unique/lignes=500000-24     7.000 ± 0%    7.000 ± 0%       ~ (p=1.000 n=6) ¹
+StoreRequete/index=avec-index/empreintes=unique/lignes=500000-24     7.000 ± 0%    7.000 ± 0%       ~ (p=1.000 n=6) ¹
+StoreRequete/index=sans-index/empreintes=repetee/lignes=200-24       7.000 ± 0%    7.000 ± 0%       ~ (p=1.000 n=6) ¹
+StoreRequete/index=avec-index/empreintes=repetee/lignes=200-24       7.000 ± 0%    7.000 ± 0%       ~ (p=1.000 n=6) ¹
+StoreRequete/index=sans-index/empreintes=repetee/lignes=20000-24     7.000 ± 0%    7.000 ± 0%       ~ (p=1.000 n=6) ¹
+StoreRequete/index=avec-index/empreintes=repetee/lignes=20000-24     7.000 ± 0%    7.000 ± 0%       ~ (p=1.000 n=6) ¹
+StoreRequete/index=sans-index/empreintes=repetee/lignes=500000-24    7.000 ± 0%    7.000 ± 0%       ~ (p=1.000 n=6) ¹
+StoreRequete/index=avec-index/empreintes=repetee/lignes=500000-24    7.000 ± 0%    7.000 ± 0%       ~ (p=1.000 n=6) ¹
+geomean                                                              45.35         45.35       +0.00%
+¹ all samples are equal

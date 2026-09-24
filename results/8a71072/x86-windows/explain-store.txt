@@ -1,0 +1,57 @@
+=== RUN   TestIndexChangeLePlan
+=== RUN   TestIndexChangeLePlan/empreintes=uniques
+    store_test.go:150: === sans index ===
+        GroupAggregate  (cost=0.00..442.01 rows=1 width=16) (actual time=0.533..0.534 rows=1 loops=1)
+          Buffers: shared hit=192
+          ->  Seq Scan on turns  (cost=0.00..442.00 rows=1 width=8) (actual time=0.008..0.531 rows=1 loops=1)
+                Filter: (fingerprint = '3'::bigint)
+                Rows Removed by Filter: 19999
+                Buffers: shared hit=192
+        Planning:
+          Buffers: shared hit=17
+        Planning Time: 0.144 ms
+        Execution Time: 0.547 ms
+        
+        === avec index ===
+        GroupAggregate  (cost=0.29..8.32 rows=1 width=16) (actual time=0.018..0.018 rows=1 loops=1)
+          Buffers: shared hit=1 read=2
+          ->  Index Only Scan using idx_turns_fingerprint on turns  (cost=0.29..8.30 rows=1 width=8) (actual time=0.014..0.015 rows=1 loops=1)
+                Index Cond: (fingerprint = '3'::bigint)
+                Heap Fetches: 1
+                Buffers: shared hit=1 read=2
+        Planning:
+          Buffers: shared hit=5 read=1
+        Planning Time: 0.104 ms
+        Execution Time: 0.033 ms
+=== RUN   TestIndexChangeLePlan/empreintes=repetees
+    store_test.go:150: === sans index ===
+        GroupAggregate  (cost=0.00..447.01 rows=1 width=16) (actual time=0.573..0.573 rows=1 loops=1)
+          Buffers: shared hit=192
+          ->  Seq Scan on turns  (cost=0.00..442.00 rows=2000 width=8) (actual time=0.008..0.515 rows=2000 loops=1)
+                Filter: (fingerprint = '3'::bigint)
+                Rows Removed by Filter: 18000
+                Buffers: shared hit=192
+        Planning:
+          Buffers: shared hit=17
+        Planning Time: 0.149 ms
+        Execution Time: 0.586 ms
+        
+        === avec index ===
+        GroupAggregate  (cost=23.79..245.80 rows=1 width=16) (actual time=0.271..0.271 rows=1 loops=1)
+          Buffers: shared hit=148 read=4
+          ->  Bitmap Heap Scan on turns  (cost=23.79..240.79 rows=2000 width=8) (actual time=0.044..0.218 rows=2000 loops=1)
+                Recheck Cond: (fingerprint = '3'::bigint)
+                Heap Blocks: exact=148
+                Buffers: shared hit=148 read=4
+                ->  Bitmap Index Scan on idx_turns_fingerprint  (cost=0.00..23.29 rows=2000 width=0) (actual time=0.032..0.032 rows=2000 loops=1)
+                      Index Cond: (fingerprint = '3'::bigint)
+                      Buffers: shared read=4
+        Planning:
+          Buffers: shared hit=5 read=1
+        Planning Time: 0.102 ms
+        Execution Time: 0.294 ms
+--- PASS: TestIndexChangeLePlan (0.57s)
+    --- PASS: TestIndexChangeLePlan/empreintes=uniques (0.29s)
+    --- PASS: TestIndexChangeLePlan/empreintes=repetees (0.28s)
+PASS
+ok  	gol-wildfire/internal/store	0.706s
