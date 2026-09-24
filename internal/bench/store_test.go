@@ -97,7 +97,7 @@ func BenchmarkStoreInsertion(b *testing.B) {
 // empreintes.
 //
 // La seconde dimension n'était pas prévue. Elle a été ajoutée après une mesure
-// qui contredisait l'hypothèse A : sur 20 000 lignes, l'index *allongeait* la
+// qui contredisait l'hypothèse I/O-4 A : sur 20 000 lignes, l'index *allongeait* la
 // requête. Le plan l'expliquait — avec une empreinte répétée une fois sur dix,
 // le prédicat retient 10 % de la table, PostgreSQL doit de toute façon visiter
 // presque toutes les pages, et le détour par l'index s'ajoute au parcours au

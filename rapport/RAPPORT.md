@@ -52,7 +52,7 @@ Les valeurs de cache sont celles exposées par sysctl, sans description exhausti
 | OS                        | macOS 15.5 (build 24F74)                                                           |
 | Runtime                   | Go 1.27.1, darwin/arm64, CGO_ENABLED=1, GOGC=100 ; variable GOMAXPROCS non définie |
 | SIMD disponibles          | NEON 128 bits (pas d'AVX : architecture ARM)                                       |
-| Alimentation              | **Sur secteur**, mode économie d’énergie désactivé (déclaré par Cherif)            |
+| Alimentation              | **Sur secteur**, mode économie d'énergie désactivé (déclaré par Cherif)            |
 
 **Quatre réserves à porter au crédit de la métrologie, pas à sa charge :**
 
@@ -971,7 +971,7 @@ l'étape I/O-5 exploitera avec `sync.Pool`.
 Les deux hypothèses ci-dessous sont écrites **avant** d'écrire le code, conformément à
 `constitution.md` §3. Elles seront confrontées à la mesure, y compris si elles se révèlent fausses.
 
-> **Hypothèse A — l'index.** Une table de tours porte 500 lignes par exécution et quelques dizaines
+> **Hypothèse I/O-4 A — l'index.** Une table de tours porte 500 lignes par exécution et quelques dizaines
 > de milliers après plusieurs campagnes. Une recherche par empreinte sans index impose un `Seq Scan`,
 > dont le coût croît linéairement avec le nombre de lignes ; un index B-tree sur l'empreinte doit le
 > transformer en `Index Scan` à coût logarithmique. **Gain attendu : d'un ordre de grandeur sur le
@@ -980,7 +980,7 @@ Les deux hypothèses ci-dessous sont écrites **avant** d'écrire le code, confo
 > **Vérification :** `EXPLAIN (ANALYZE, BUFFERS)` sur la même requête, sans puis avec index, à
 > plusieurs volumes de table.
 
-> **Hypothèse B — le groupage.** Insérer 500 tours un par un impose 500 allers-retours réseau ; le
+> **Hypothèse I/O-4 B — le groupage.** Insérer 500 tours un par un impose 500 allers-retours réseau ; le
 > coût dominant est la **latence par requête**, pas le volume transmis — chaque ligne fait quelques
 > dizaines d'octets. Grouper les insertions en une seule commande `COPY` doit donc faire chuter le
 > temps total d'un facteur voisin du nombre d'allers-retours économisés. **Gain attendu : un ordre de
@@ -998,7 +998,7 @@ Mesures au commit `8a71072`, banc B, PostgreSQL 17.11 en conteneur (`fsync=off`,
 [benchstat-store.txt](../results/8a71072/x86-controle/benchstat-store.txt),
 [explain-store.txt](../results/8a71072/x86-controle/explain-store.txt).
 
-**Hypothèse B — confirmée.**
+**Hypothèse I/O-4 B — confirmée.**
 
 | Tours insérés | Une requête par tour | Un seul `COPY` | Rapport |
 |---|---|---|---|
@@ -1011,7 +1011,7 @@ font 207 µs. Le volume transmis, lui, est identique dans les deux modes. Une ca
 tours, donc le groupage vaut déjà ×12,7 dans les conditions réelles du projet — et sur `localhost`,
 c'est-à-dire dans le cas le plus défavorable à la démonstration.
 
-**Hypothèse A — partiellement réfutée.** Le sens est bon, le seuil était faux.
+**Hypothèse I/O-4 A — partiellement réfutée.** Le sens est bon, le seuil était faux.
 
 | Lignes | Empreintes uniques (cas réel) | | Empreintes répétées 1/10 | |
 |---|---|---|---|---|
@@ -1125,7 +1125,7 @@ et l'état (512 Kio) ; `proto` alloue quatre `[]uint32` de 4 Mio plus le tampon 
 des tampons **volumineux, de taille constante et rendus immédiatement** — le cas d'école de
 `sync.Pool`.
 
-> **Hypothèse C — le réemploi de tampons.** Un `sync.Pool` ramènera les allocations par snapshot à
+> **Hypothèse I/O-5 A — le réemploi de tampons.** Un `sync.Pool` ramènera les allocations par snapshot à
 > ~0 en régime établi : c'est mécanique, et ce n'est pas la question intéressante. La question est
 > le **temps**. Le coût évité est celui de la mise à zéro des tampons neufs — Go garantit une
 > mémoire nulle à l'allocation — et du travail du ramasse-miettes sur 1,5 Mio à 20 Mio de déchets
@@ -1138,14 +1138,14 @@ des tampons **volumineux, de taille constante et rendus immédiatement** — le 
 > l'hypothèse est réfutée si l'écart de temps n'est pas significatif alors que les allocations
 > tombent bien à zéro.
 
-> **Hypothèse D — la déduplication des snapshots.** Quand le feu s'éteint, l'état devient un point
+> **Hypothèse I/O-5 B — la déduplication des snapshots.** Quand le feu s'éteint, l'état devient un point
 > fixe : tous les snapshots suivants sont identiques. Ne pas réécrire un état d'empreinte déjà vue
 > supprime donc non pas le coût d'un tampon, mais **la sérialisation et l'écriture entières**.
-> **Gain attendu : bien supérieur à celui de l'hypothèse C**, et proportionnel à la part de la
+> **Gain attendu : bien supérieur à celui de l'hypothèse I/O-5 A**, et proportionnel à la part de la
 > simulation passée après extinction — nul, en revanche, dans un scénario qui brûle jusqu'au bout.
 > **Vérification :** taux de réussite du cache mesuré sur une exécution réelle, et non supposé.
 
-Sous-question de l'hypothèse D, qui décide de la structure de données : **un cache d'une seule
+Sous-question de l'hypothèse I/O-5 B, qui décide de la structure de données : **un cache d'une seule
 entrée suffit-il ?** Un point fixe est un cycle de période 1 ; il est entièrement capté en
 comparant à la dernière empreinte. Un LRU n'apporte quelque chose que s'il existe des cycles de
 période supérieure. La structure retenue sera celle que la mesure justifie : si une entrée capte
@@ -1202,7 +1202,7 @@ pour les deux versions (p = 0,393). Le compromis est donc propre au banc A.
 
 ### Hypothèse partiellement réfutée — le seuil de rentabilité d'un index
 
-**Hypothèse (§3.3, écrite avant le code) :** un index sur l'empreinte fait gagner un ordre de
+**Hypothèse I/O-4 A (§3.3, écrite avant le code) :** un index sur l'empreinte fait gagner un ordre de
 grandeur « dès quelques dizaines de milliers de lignes ».
 
 **Mesure :** à 20 000 lignes, le gain n'est que de ×3,9 ; l'ordre de grandeur n'apparaît qu'à
