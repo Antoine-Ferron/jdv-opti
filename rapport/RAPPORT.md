@@ -631,6 +631,48 @@ nul en régime saturé. Son apport principal n'est pas la vitesse mais la
 plus fiable pour toutes les étapes suivantes — ce qui, vu la dispersion du banc de
 référence (§1.1, réserve 4), vaut mieux qu'un gain de quelques pour cent.
 
+#### Profils des deux bancs, et ce qu'ils désignent pour la suite
+
+Profils produits sur les deux machines au commit `1d3a093`
+([banc A](../results/1d3a093/m1-air/profiles/), [banc B](../results/1d3a093/x86-controle/profiles/)),
+en deux régimes : le réglage par défaut de `make profile` (64 foyers, 500 tours, 1024²) et le
+scénario front (un foyer, 50 tours, 4096²).
+
+| Poste | A · naive | A · flat | B · naive | B · flat |
+|---|---:|---:|---:|---:|
+| **Régime saturé** | | | | |
+| `Step` | 76,3 % | 79,5 % | 48,8 % | 36,8 % |
+| `fire.Mod` | 9,2 % | 6,7 % | **37,2 %** | **40,9 %** |
+| `Burning` | 3,3 % | 6,2 % | 2,8 % | 3,7 % |
+| `runtime.madvise` | 1,4 % | **absent** | absent | absent |
+| **Scénario front** | | | | |
+| `Step` | 77,6 % | 73,3 % | 74,3 % | 68,6 % |
+| **`Burning`** | **20,7 %** | **21,5 %** | **23,4 %** | **27,8 %** |
+| `fire.Mod` | **absent** | **absent** | **absent** | **absent** |
+
+Trois enseignements.
+
+**`madvise` disparaît bien chez `flat`**, comme l'hypothèse le prévoyait — mais l'effet est plus
+petit qu'annoncé au §2.1 : il y pesait 5,43 %, relevé sur une campagne faite *sur batterie*, contre
+1,43 % ici sur secteur. Supprimer les allocations économise donc environ un point de CPU, pas cinq.
+
+**`fire.Mod` disparaît des quatre profils en scénario front.** Avec un seul foyer, presque aucune
+case ne brûle, donc presque aucune propagation : le modulo torique n'est appelé qu'à travers elle.
+L'optimisation `ghost` ne rapportera donc rien dans ce régime, et tout dans l'autre — où elle vaut
+37 à 41 % sur le banc B contre 7 à 9 % sur le banc A.
+
+**`Burning` pèse 21 à 28 % du CPU en scénario front, sur les deux bancs et les deux
+implémentations**, contre 3 à 6 % en régime saturé. Quand peu de cases brûlent, recompter la carte
+entière à chaque appel devient le deuxième poste du programme, juste derrière `Step`. C'est le plus
+gros gisement encore ouvert sur le banc de référence, et le moins coûteux à combler — un compteur
+tenu à jour dans `Step` suffit. Cela confirme l'étape `counters` prévue, et la fait passer devant
+`ghost` dans l'ordre des priorités.
+
+> **Réserve de lecture.** Chaque profil est une exécution unique. Les *parts relatives* sont
+> exploitables ; les totaux ne le sont pas — comparer 4,89 s à 5,37 s entre deux profils n'aurait
+> pas de sens, ces durées incluant l'échantillonnage et variant d'une exécution à l'autre. Les
+> comparaisons de temps viennent de benchstat et d'Hyperfine, pas d'ici.
+
 ### 3.1 Mémoire & localité de cache
 
 - Grille plate `[]uint8` + double tampon, et tampon d'ignition réutilisé : zéro allocation par tour.
