@@ -801,7 +801,7 @@ du contenu de la carte, ni de l'état du ramasse-miettes. Une taille prévisible
 qualité en soi pour un format d'archive — elle permet de dimensionner un tampon à l'avance, ce que
 l'étape I/O-5 exploitera avec `sync.Pool`.
 
-#### Étape I/O-4 — persistance PostgreSQL *(hypothèses posées avant l'implémentation)*
+#### Étape I/O-4 — persistance PostgreSQL
 
 Les deux hypothèses ci-dessous sont écrites **avant** d'écrire le code, conformément à
 `constitution.md` §3. Elles seront confrontées à la mesure, y compris si elles se révèlent fausses.
@@ -824,6 +824,74 @@ Les deux hypothèses ci-dessous sont écrites **avant** d'écrire le code, confo
 
 L'intérêt de la seconde est qu'elle se vérifie sur `localhost`, où la latence réseau est quasi nulle :
 si le gain est déjà net dans ces conditions, il ne fera que croître sur une base distante.
+
+##### Confrontation à la mesure
+
+Mesures au commit `8a71072`, banc B, PostgreSQL 17.11 en conteneur (`fsync=off`, voir
+[env.md](../results/8a71072/x86-controle/env.md)). Sources :
+[store.txt](../results/8a71072/x86-controle/store.txt),
+[benchstat-store.txt](../results/8a71072/x86-controle/benchstat-store.txt),
+[explain-store.txt](../results/8a71072/x86-controle/explain-store.txt).
+
+**Hypothèse B — confirmée.**
+
+| Tours insérés | Une requête par tour | Un seul `COPY` | Rapport |
+|---|---|---|---|
+| 500   | 83,35 ms ± 11 % | 6,565 ms ± 16 % | **×12,7** |
+| 5 000 | 1,033 s ± 12 %  | 54,38 ms ± 5 %  | **×19,0** |
+
+Le rapport **croît avec le nombre de tours**, ce qui est la signature attendue d'un coût dominé par
+les allers-retours : 83,35 ms pour 500 insertions font 167 µs par insertion, et 1,033 s pour 5 000 en
+font 207 µs. Le volume transmis, lui, est identique dans les deux modes. Une campagne écrit 500
+tours, donc le groupage vaut déjà ×12,7 dans les conditions réelles du projet — et sur `localhost`,
+c'est-à-dire dans le cas le plus défavorable à la démonstration.
+
+**Hypothèse A — partiellement réfutée.** Le sens est bon, le seuil était faux.
+
+| Lignes | Empreintes uniques (cas réel) | | Empreintes répétées 1/10 | |
+|---|---|---|---|---|
+| | sans index | avec index | sans index | avec index |
+| 200     | 147,5 µs | 148,3 µs (**×1,0**) | 160,1 µs | 160,9 µs (**×1,0**) |
+| 20 000  | 601,8 µs | 153,9 µs (**×3,9**) | 635,7 µs | 300,9 µs (×2,1) |
+| 500 000 | 8 257 µs | 176,5 µs (**×46,8**) | 8 776 µs | 4 567 µs (×1,9) |
+
+Ce que l'hypothèse annonçait et qui est vrai : aucun gain en deçà de quelques centaines de lignes —
+à 200 lignes l'écart (147,5 contre 148,3 µs) tient dans le bruit. Elle prévoyait un effet *négatif* ;
+il n'a pas été observé, l'index se contente d'être inutile.
+
+Ce qu'elle annonçait et qui est faux : « un ordre de grandeur dès quelques dizaines de milliers de
+lignes ». À 20 000 lignes le gain n'est que de ×3,9 ; l'ordre de grandeur n'arrive qu'à 500 000
+(×46,8). **Le seuil a été sous-estimé d'un facteur 25 environ.**
+
+L'explication tient dans un plancher que l'hypothèse ignorait. Une requête sur une table de 200
+lignes coûte 147 µs sans index — presque rien n'est passé à lire 200 lignes, ce temps est
+essentiellement celui de l'aller-retour client/serveur. Or c'est la même grandeur que les 167 µs par
+insertion unitaire mesurés plus haut, par une voie totalement indépendante. **Le gain d'un index est
+donc borné par ce plancher** : à 500 000 lignes, l'index ramène la requête à 176,5 µs, soit le
+plancher ; il n'y a rien à gagner au-delà, quel que soit le volume.
+
+**Découverte non prévue : la sélectivité prime sur le volume.** À 500 000 lignes, la même requête,
+avec le même index, gagne ×46,8 sur des empreintes uniques et ×1,9 sur des empreintes répétées une
+fois sur dix. `EXPLAIN` dit pourquoi — à 20 000 lignes :
+
+| | Plan sans index | Plan avec index | Pages lues |
+|---|---|---|---|
+| Uniques  | `Seq Scan`, 0,801 ms | `Index Only Scan`, 0,033 ms | 192 → **3** |
+| Répétées | `Seq Scan`, 0,602 ms | `Bitmap Heap Scan`, 0,256 ms | 192 → **152** |
+
+Sur des empreintes uniques, l'index suffit à répondre : `Index Only Scan`, 3 pages, la table n'est
+pas touchée. Sur des empreintes répétées, le prédicat retient 2 000 lignes sur 20 000 ; PostgreSQL
+choisit un `Bitmap Heap Scan` et doit tout de même visiter 152 des 192 pages. L'index évite le filtre,
+pas les lectures.
+
+C'est ce cas qui a fait ajouter la distribution comme dimension de mesure : la première campagne,
+menée avec des empreintes répétées, concluait à un index sans intérêt. Elle mesurait en réalité un
+prédicat non sélectif. **Un index ne se juge pas au nombre de lignes de la table, mais à la
+proportion de lignes que le prédicat écarte** — et la table réelle porte des empreintes quasi
+uniques, une répétition signalant un cycle de la simulation.
+
+Les allocations côté client sont constantes (7 par requête, ~483 o), ce qui confirme que la mesure
+porte bien sur la base et non sur le pilote.
 
 #### À venir
 
@@ -861,6 +929,31 @@ du temps CPU ni du pic de mémoire.
 résultats sont conservés pour la comparaison ; la variante reste à implémenter
 et à mesurer avant de décider de la version à retenir.
 
+### Hypothèse partiellement réfutée — le seuil de rentabilité d'un index
+
+**Hypothèse (§3.3, écrite avant le code) :** un index sur l'empreinte fait gagner un ordre de
+grandeur « dès quelques dizaines de milliers de lignes ».
+
+**Mesure :** à 20 000 lignes, le gain n'est que de ×3,9 ; l'ordre de grandeur n'apparaît qu'à
+500 000 lignes (×46,8). Le seuil annoncé était sous-estimé d'un facteur 25 environ. Source :
+[benchstat-store.txt](../results/8a71072/x86-controle/benchstat-store.txt).
+
+**Explication, vérifiée par une seconde voie :** le gain est borné par un plancher que l'hypothèse
+ignorait. Une requête sur 200 lignes coûte 147 µs sans index, alors qu'il n'y a presque rien à lire :
+ce temps est celui de l'aller-retour client/serveur. La mesure d'insertion, indépendante, donne
+167 µs par requête — même grandeur. À 500 000 lignes, l'index ramène la requête à 176,5 µs, soit ce
+plancher : le gain ne peut pas croître au-delà.
+
+**Enseignement :** raisonner en ordre de grandeur sur le seul volume de données conduit à annoncer
+un seuil faux. Un gain relatif se borne toujours à ce que le coût incompressible laisse disponible,
+et ici ce coût — la latence d'un aller-retour — n'a rien à voir avec l'index. La mesure a par
+ailleurs fait apparaître un facteur non anticipé, la sélectivité du prédicat (§3.3), qui pèse plus
+lourd que le volume : ×46,8 sur des empreintes uniques contre ×1,9 sur des empreintes répétées, à
+volume et index identiques.
+
+**Retour arrière :** aucun. L'index est conservé — la conclusion reste qu'il faut l'ajouter, seule
+la prévision chiffrée était fausse.
+
 ### Autres pistes à explorer
 
 > **Tentative :** …
@@ -891,6 +984,19 @@ git clone https://github.com/Antoine-Ferron/jdv-opti.git && cd jdv-opti
 make tools   # benchstat
 make bench   # env + tests + go bench + hyperfine + benchstat -> results/<date>-<commit>/
 ```
+
+Les mesures de l'axe I/O qui touchent PostgreSQL (§3.3, étape I/O-4) demandent la base, et elles
+seules :
+
+```bash
+make db      # PostgreSQL en conteneur, sans volume : chaque démarrage repart d'une base vide
+go test ./internal/bench/ -run XXX -bench BenchmarkStore -count 6 | tee store.txt
+go test ./internal/store/ -count=1 -v   # rejoue les plans EXPLAIN ANALYZE
+make db-stop # arrête la base et jette les données
+```
+
+Sans base, ces tests et ces bancs sont **sautés** et non échoués : le reste de la suite ne dépend
+pas de Docker, et `make test` reste vert sur une machine qui ne travaille pas sur cet axe.
 
 ### 5.2 Tableau de synthèse
 

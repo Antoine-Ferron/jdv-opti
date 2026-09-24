@@ -1,0 +1,102 @@
+goos: linux
+goarch: amd64
+pkg: gol-wildfire/internal/bench
+cpu: Intel(R) Core(TM) Ultra 9 275HX
+BenchmarkStoreInsertion/mode=unitaire/tours=500-24         	      13	  92169085 ns/op	       500.0 tours/op	  116945 B/op	    3990 allocs/op
+BenchmarkStoreInsertion/mode=unitaire/tours=500-24         	      13	  83850785 ns/op	       500.0 tours/op	  116932 B/op	    3989 allocs/op
+BenchmarkStoreInsertion/mode=unitaire/tours=500-24         	      14	  83156097 ns/op	       500.0 tours/op	  116949 B/op	    3989 allocs/op
+BenchmarkStoreInsertion/mode=unitaire/tours=500-24         	      14	  82831967 ns/op	       500.0 tours/op	  116616 B/op	    3989 allocs/op
+BenchmarkStoreInsertion/mode=unitaire/tours=500-24         	      13	  83540553 ns/op	       500.0 tours/op	  116934 B/op	    3989 allocs/op
+BenchmarkStoreInsertion/mode=unitaire/tours=500-24         	      14	  81494671 ns/op	       500.0 tours/op	  116948 B/op	    3989 allocs/op
+BenchmarkStoreInsertion/mode=copy/tours=500-24             	     189	   6517063 ns/op	       500.0 tours/op	  179942 B/op	    3031 allocs/op
+BenchmarkStoreInsertion/mode=copy/tours=500-24             	     181	   6381611 ns/op	       500.0 tours/op	  179663 B/op	    3030 allocs/op
+BenchmarkStoreInsertion/mode=copy/tours=500-24             	     190	   6469228 ns/op	       500.0 tours/op	  181960 B/op	    3031 allocs/op
+BenchmarkStoreInsertion/mode=copy/tours=500-24             	     184	   7445267 ns/op	       500.0 tours/op	  178113 B/op	    3030 allocs/op
+BenchmarkStoreInsertion/mode=copy/tours=500-24             	     182	   6613642 ns/op	       500.0 tours/op	  179238 B/op	    3030 allocs/op
+BenchmarkStoreInsertion/mode=copy/tours=500-24             	     168	   7605813 ns/op	       500.0 tours/op	  180112 B/op	    3030 allocs/op
+BenchmarkStoreInsertion/mode=unitaire/tours=5000-24        	       1	1148857438 ns/op	      5000 tours/op	 1241744 B/op	   49025 allocs/op
+BenchmarkStoreInsertion/mode=unitaire/tours=5000-24        	       1	1030440684 ns/op	      5000 tours/op	 1241760 B/op	   49025 allocs/op
+BenchmarkStoreInsertion/mode=unitaire/tours=5000-24        	       2	1075401970 ns/op	      5000 tours/op	 1241744 B/op	   49025 allocs/op
+BenchmarkStoreInsertion/mode=unitaire/tours=5000-24        	       2	 966432802 ns/op	      5000 tours/op	 1241744 B/op	   49025 allocs/op
+BenchmarkStoreInsertion/mode=unitaire/tours=5000-24        	       1	1035555363 ns/op	      5000 tours/op	 1241760 B/op	   49025 allocs/op
+BenchmarkStoreInsertion/mode=unitaire/tours=5000-24        	       2	 908710528 ns/op	      5000 tours/op	 1241752 B/op	   49025 allocs/op
+BenchmarkStoreInsertion/mode=copy/tours=5000-24            	      20	  54872946 ns/op	      5000 tours/op	 1003792 B/op	   39042 allocs/op
+BenchmarkStoreInsertion/mode=copy/tours=5000-24            	      21	  53629134 ns/op	      5000 tours/op	  988938 B/op	   39040 allocs/op
+BenchmarkStoreInsertion/mode=copy/tours=5000-24            	      20	  53812239 ns/op	      5000 tours/op	  993688 B/op	   39040 allocs/op
+BenchmarkStoreInsertion/mode=copy/tours=5000-24            	      21	  53893592 ns/op	      5000 tours/op	  992175 B/op	   39040 allocs/op
+BenchmarkStoreInsertion/mode=copy/tours=5000-24            	      20	  55655227 ns/op	      5000 tours/op	  993895 B/op	   39040 allocs/op
+BenchmarkStoreInsertion/mode=copy/tours=5000-24            	      19	  57087660 ns/op	      5000 tours/op	  999074 B/op	   39042 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=unique/lignes=200-24         	    7254	    144054 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=unique/lignes=200-24         	    8899	    148481 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=unique/lignes=200-24         	    7816	    146906 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=unique/lignes=200-24         	    8994	    148695 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=unique/lignes=200-24         	    9176	    148069 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=unique/lignes=200-24         	    7054	    145176 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=unique/lignes=200-24         	    9204	    148880 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=unique/lignes=200-24         	    9669	    144283 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=unique/lignes=200-24         	    8143	    147649 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=unique/lignes=200-24         	    8362	    149565 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=unique/lignes=200-24         	    7490	    151737 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=unique/lignes=200-24         	    8402	    143983 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=unique/lignes=20000-24       	    1825	    591354 ns/op	     482 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=unique/lignes=20000-24       	    1917	    598946 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=unique/lignes=20000-24       	    1956	    604852 ns/op	     482 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=unique/lignes=20000-24       	    1833	    604618 ns/op	     482 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=unique/lignes=20000-24       	    1960	    595922 ns/op	     482 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=unique/lignes=20000-24       	    2071	    621864 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=unique/lignes=20000-24       	    8292	    151100 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=unique/lignes=20000-24       	    7707	    143225 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=unique/lignes=20000-24       	    8314	    145353 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=unique/lignes=20000-24       	    8640	    158298 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=unique/lignes=20000-24       	    7944	    160863 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=unique/lignes=20000-24       	    7880	    156636 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=unique/lignes=500000-24      	     148	   8182300 ns/op	     476 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=unique/lignes=500000-24      	     139	   8194658 ns/op	     479 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=unique/lignes=500000-24      	     141	   8426857 ns/op	     516 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=unique/lignes=500000-24      	     145	   8273321 ns/op	     492 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=unique/lignes=500000-24      	     142	   8276827 ns/op	     478 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=unique/lignes=500000-24      	     144	   8241127 ns/op	     477 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=unique/lignes=500000-24      	    5485	    184199 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=unique/lignes=500000-24      	    5730	    175747 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=unique/lignes=500000-24      	    7209	    173856 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=unique/lignes=500000-24      	    5785	    173672 ns/op	     485 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=unique/lignes=500000-24      	    7104	    177153 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=unique/lignes=500000-24      	    6807	    184760 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=repetee/lignes=200-24        	    7398	    164079 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=repetee/lignes=200-24        	    7387	    166303 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=repetee/lignes=200-24        	    7111	    161696 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=repetee/lignes=200-24        	    7780	    155263 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=repetee/lignes=200-24        	    7010	    158469 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=repetee/lignes=200-24        	    7683	    155891 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=repetee/lignes=200-24        	    7395	    161387 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=repetee/lignes=200-24        	    7336	    158522 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=repetee/lignes=200-24        	    8077	    164545 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=repetee/lignes=200-24        	    7708	    157729 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=repetee/lignes=200-24        	    8080	    167860 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=repetee/lignes=200-24        	    8095	    160350 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=repetee/lignes=20000-24      	    1850	    644410 ns/op	     482 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=repetee/lignes=20000-24      	    1888	    624347 ns/op	     485 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=repetee/lignes=20000-24      	    1964	    635401 ns/op	     485 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=repetee/lignes=20000-24      	    1932	    638946 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=repetee/lignes=20000-24      	    1996	    622366 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=repetee/lignes=20000-24      	    1852	    636005 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=repetee/lignes=20000-24      	    3938	    307200 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=repetee/lignes=20000-24      	    3873	    300774 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=repetee/lignes=20000-24      	    4060	    301943 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=repetee/lignes=20000-24      	    4224	    299829 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=repetee/lignes=20000-24      	    4209	    298257 ns/op	     484 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=repetee/lignes=20000-24      	    3806	    301103 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=repetee/lignes=500000-24     	     134	   8686540 ns/op	     498 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=repetee/lignes=500000-24     	     138	   8870263 ns/op	     479 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=repetee/lignes=500000-24     	     135	   8824108 ns/op	     480 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=repetee/lignes=500000-24     	     130	   8753737 ns/op	     483 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=repetee/lignes=500000-24     	     133	   8697643 ns/op	     481 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=sans-index/empreintes=repetee/lignes=500000-24     	     136	   8798725 ns/op	     480 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=repetee/lignes=500000-24     	     277	   4572780 ns/op	     479 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=repetee/lignes=500000-24     	     244	   4643617 ns/op	     487 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=repetee/lignes=500000-24     	     270	   4560933 ns/op	     480 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=repetee/lignes=500000-24     	     271	   4462474 ns/op	     480 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=repetee/lignes=500000-24     	     267	   4634750 ns/op	     481 B/op	       7 allocs/op
+BenchmarkStoreRequete/index=avec-index/empreintes=repetee/lignes=500000-24     	     270	   4461315 ns/op	     480 B/op	       7 allocs/op
+PASS
+ok  	gol-wildfire/internal/bench	157.148s

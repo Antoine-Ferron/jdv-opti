@@ -102,42 +102,52 @@ func TestInsertionsEquivalentes(t *testing.T) {
 // L'index doit changer le plan d'exécution, pas seulement le temps : c'est le
 // passage de Seq Scan à Index Scan qui est la preuve attendue au §3.3.
 //
-// Empreintes uniques, comme dans une vraie exécution : c'est la seule
-// distribution pour laquelle un index a un sens, et donc la seule dont le
-// changement de plan démontre quelque chose.
+// Les deux distributions sont parcourues parce qu'elles donnent deux plans
+// différents pour la même requête et le même volume. Les plans sont journalisés
+// : ils sont la pièce à conviction du rapport, et `go test -v` les rejoue.
 func TestIndexChangeLePlan(t *testing.T) {
-	ctx := context.Background()
-	s := ouvre(t)
+	for _, dist := range []struct {
+		nom    string
+		modulo int
+	}{
+		{"uniques", 0},
+		{"repetees", 10},
+	} {
+		t.Run("empreintes="+dist.nom, func(t *testing.T) {
+			ctx := context.Background()
+			s := ouvre(t)
 
-	run, err := s.NewRun(ctx, "naive", 1024, 1024, 42)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := s.CopyTurns(ctx, run, tours(20000, 0)); err != nil {
-		t.Fatal(err)
-	}
+			run, err := s.NewRun(ctx, "naive", 1024, 1024, 42)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := s.CopyTurns(ctx, run, tours(20000, dist.modulo)); err != nil {
+				t.Fatal(err)
+			}
 
-	if err := s.DropIndex(ctx); err != nil {
-		t.Fatal(err)
-	}
-	sans, err := s.Explain(ctx, 3)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(sans, "Seq Scan") {
-		t.Errorf("sans index, un parcours séquentiel était attendu ; plan obtenu :\n%s", sans)
-	}
+			if err := s.DropIndex(ctx); err != nil {
+				t.Fatal(err)
+			}
+			sans, err := s.Explain(ctx, 3)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(sans, "Seq Scan") {
+				t.Errorf("sans index, un parcours séquentiel était attendu ; plan obtenu :\n%s", sans)
+			}
 
-	if err := s.AddIndex(ctx); err != nil {
-		t.Fatal(err)
-	}
-	avec, err := s.Explain(ctx, 3)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(avec, "Index") {
-		t.Errorf("avec index, un parcours par index était attendu ; plan obtenu :\n%s", avec)
-	}
+			if err := s.AddIndex(ctx); err != nil {
+				t.Fatal(err)
+			}
+			avec, err := s.Explain(ctx, 3)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(avec, "Index") {
+				t.Errorf("avec index, un parcours par index était attendu ; plan obtenu :\n%s", avec)
+			}
 
-	t.Logf("=== sans index ===\n%s\n=== avec index ===\n%s", sans, avec)
+			t.Logf("=== sans index ===\n%s\n=== avec index ===\n%s", sans, avec)
+		})
+	}
 }

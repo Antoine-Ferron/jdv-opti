@@ -1,0 +1,59 @@
+goos: linux
+goarch: amd64
+pkg: gol-wildfire/internal/bench
+cpu: Intel(R) Core(TM) Ultra 9 275HX
+                                                 │              │     sans-index      │     avec-index     │
+                                                 │    sec/op    │    sec/op     vs base   │   sec/op     vs base   │
+StoreInsertion/mode=unitaire/tours=500-24          83.35m ± 11%
+StoreInsertion/mode=copy/tours=500-24              6.565m ± 16%
+StoreInsertion/mode=unitaire/tours=5000-24          1.033 ± 12%
+StoreInsertion/mode=copy/tours=5000-24             54.38m ±  5%
+StoreRequete/empreintes=unique/lignes=200-24                       147.5µ ± 2%          148.3µ ± 3%
+StoreRequete/empreintes=unique/lignes=20000-24                     601.8µ ± 3%          153.9µ ± 7%
+StoreRequete/empreintes=unique/lignes=500000-24                   8257.2µ ± 2%          176.5µ ± 5%
+StoreRequete/empreintes=repetee/lignes=200-24                      160.1µ ± 4%          160.9µ ± 4%
+StoreRequete/empreintes=repetee/lignes=20000-24                    635.7µ ± 2%          300.9µ ± 2%
+StoreRequete/empreintes=repetee/lignes=500000-24                   8.776m ± 1%          4.567m ± 2%
+geomean                                            74.46m          931.8µ       ? ¹ ²   310.1µ       ? ¹ ²
+¹ benchmark set differs from baseline; geomeans may not be comparable
+² ratios must be >0 to compute geomean
+
+                                           │             │
+                                           │  tours/op   │
+StoreInsertion/mode=unitaire/tours=500-24     500.0 ± 0%
+StoreInsertion/mode=copy/tours=500-24         500.0 ± 0%
+StoreInsertion/mode=unitaire/tours=5000-24   5.000k ± 0%
+StoreInsertion/mode=copy/tours=5000-24       5.000k ± 0%
+geomean                                      1.581k
+
+                                                 │              │    sans-index     │    avec-index     │
+                                                 │     B/op     │    B/op     vs base   │    B/op     vs base   │
+StoreInsertion/mode=unitaire/tours=500-24          114.2Ki ± 0%
+StoreInsertion/mode=copy/tours=500-24              175.6Ki ± 1%
+StoreInsertion/mode=unitaire/tours=5000-24         1.184Mi ± 0%
+StoreInsertion/mode=copy/tours=5000-24             970.5Ki ± 1%
+StoreRequete/empreintes=unique/lignes=200-24                      483.5 ± 0%          484.0 ± 0%
+StoreRequete/empreintes=unique/lignes=20000-24                    482.0 ± 0%          484.0 ± 0%
+StoreRequete/empreintes=unique/lignes=500000-24                   478.5 ± 8%          484.0 ± 0%
+StoreRequete/empreintes=repetee/lignes=200-24                     483.5 ± 0%          483.0 ± 0%
+StoreRequete/empreintes=repetee/lignes=20000-24                   483.5 ± 0%          483.5 ± 0%
+StoreRequete/empreintes=repetee/lignes=500000-24                  480.5 ± 4%          480.0 ± 1%
+geomean                                            391.9Ki        481.9       ? ¹ ²   483.1       ? ¹ ²
+¹ benchmark set differs from baseline; geomeans may not be comparable
+² ratios must be >0 to compute geomean
+
+                                                 │             │    sans-index     │    avec-index     │
+                                                 │  allocs/op  │ allocs/op   vs base   │ allocs/op   vs base   │
+StoreInsertion/mode=unitaire/tours=500-24          3.989k ± 0%
+StoreInsertion/mode=copy/tours=500-24              3.030k ± 0%
+StoreInsertion/mode=unitaire/tours=5000-24         49.02k ± 0%
+StoreInsertion/mode=copy/tours=5000-24             39.04k ± 0%
+StoreRequete/empreintes=unique/lignes=200-24                     7.000 ± 0%          7.000 ± 0%
+StoreRequete/empreintes=unique/lignes=20000-24                   7.000 ± 0%          7.000 ± 0%
+StoreRequete/empreintes=unique/lignes=500000-24                  7.000 ± 0%          7.000 ± 0%
+StoreRequete/empreintes=repetee/lignes=200-24                    7.000 ± 0%          7.000 ± 0%
+StoreRequete/empreintes=repetee/lignes=20000-24                  7.000 ± 0%          7.000 ± 0%
+StoreRequete/empreintes=repetee/lignes=500000-24                 7.000 ± 0%          7.000 ± 0%
+geomean                                            12.33k        7.000       ? ¹ ²   7.000       ? ¹ ²
+¹ benchmark set differs from baseline; geomeans may not be comparable
+² ratios must be >0 to compute geomean
