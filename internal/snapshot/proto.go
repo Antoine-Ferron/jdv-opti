@@ -30,25 +30,41 @@ func init() { Register("proto", Proto{}) }
 func (Proto) Ext() string { return "pb" }
 
 func (Proto) Write(w io.Writer, s *State) error {
+	n := len(s.Fire)
 	msg := &pb.Snapshot{
 		Turn:    uint32(s.Turn),
 		Width:   uint32(s.Width),
 		Height:  uint32(s.Height),
-		Terrain: make([]uint32, len(s.Fire)), // [S6]
-		Wind:    make([]uint32, len(s.Fire)),
-		Fire:    make([]uint32, len(s.Fire)),
-		Rest:    make([]uint32, len(s.Fire)),
+		Terrain: prendreMots(n), // [S6] : la conversion reste, le tampon non
+		Wind:    prendreMots(n),
+		Fire:    prendreMots(n),
+		Rest:    prendreMots(n),
 	}
+	// Les quatre tranches sont intégralement réécrites par la boucle qui suit,
+	// ce qui rend leur réemploi sûr.
+	defer func() {
+		rendreMots(msg.Terrain)
+		rendreMots(msg.Wind)
+		rendreMots(msg.Fire)
+		rendreMots(msg.Rest)
+	}()
 	for i := range s.Fire {
 		msg.Terrain[i] = uint32(s.Terrain[i])
 		msg.Wind[i] = uint32(s.Wind[i])
 		msg.Fire[i] = uint32(s.Fire[i])
 		msg.Rest[i] = uint32(s.Rest[i])
 	}
-	buf, err := proto.Marshal(msg)
+
+	// MarshalAppend écrit dans le tampon fourni plutôt que d'en allouer un.
+	// Il peut tout de même en allouer un nouveau si celui-ci est trop court :
+	// c'est le cas du premier appel, et c'est le sien qu'on range ensuite.
+	tampon := prendreOctets(0)
+	buf, err := proto.MarshalOptions{}.MarshalAppend(tampon, msg)
 	if err != nil {
+		rendreOctets(tampon)
 		return err
 	}
+	defer rendreOctets(buf)
 	_, err = w.Write(buf)
 	return err
 }

@@ -53,7 +53,9 @@ func (p Packed) Write(w io.Writer, s *State) error {
 		return fmt.Errorf("snapshot: grille vide")
 	}
 
-	entete := make([]byte, 17)
+	// Tableau et non tranche : l'en-tête ne quitte pas la pile, donc n'alloue
+	// pas du tout — inutile de le faire passer par un pool pour 17 octets.
+	var entete [17]byte
 	binary.LittleEndian.PutUint32(entete[0:], packedMagie)
 	binary.LittleEndian.PutUint32(entete[4:], uint32(s.Turn))
 	binary.LittleEndian.PutUint32(entete[8:], uint32(s.Width))
@@ -61,12 +63,15 @@ func (p Packed) Write(w io.Writer, s *State) error {
 	if !p.SansDecor {
 		entete[16] = packedAvecDec
 	}
-	if _, err := w.Write(entete); err != nil {
+	if _, err := w.Write(entete[:]); err != nil {
 		return err
 	}
 
 	if !p.SansDecor {
-		decor := make([]byte, n)
+		decor := prendreOctets(n)
+		defer rendreOctets(decor)
+		// Chaque octet est affecté, jamais combiné : le tampon repris est donc
+		// intégralement recouvert.
 		for i := 0; i < n; i++ {
 			decor[i] = byte(s.Terrain[i])&0x03 | s.Wind[i]<<2
 		}
@@ -76,7 +81,13 @@ func (p Packed) Write(w io.Writer, s *State) error {
 	}
 
 	// Deux cases par octet : la paire dans les bits 0-3, l'impaire dans 4-7.
-	etat := make([]byte, (n+1)/2)
+	//
+	// L'indice pair *affecte* l'octet avant que l'impair ne l'enrichisse ; tout
+	// octet est donc écrit au moins une fois, y compris le dernier quand n est
+	// impair. C'est ce qui rend le tampon recyclé sûr — inverser les deux
+	// branches laisserait fuiter le snapshot précédent.
+	etat := prendreOctets((n + 1) / 2)
+	defer rendreOctets(etat)
 	for i := 0; i < n; i++ {
 		quartet := s.Fire[i]&0x03 | s.Rest[i]&0x03<<2
 		if i%2 == 0 {
