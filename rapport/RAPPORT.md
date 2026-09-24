@@ -1250,6 +1250,43 @@ ce qu'on attend, et 27,50 µs en 128² qui recoupent exactement les ~27 µs déd
 banc de séries. **Un banc dont le résultat n'est jamais lu ne mesure rien**, et la seule défense est
 de rapporter chaque temps à une grandeur physique avant de le croire.
 
+##### Portabilité — banc A
+
+Mêmes bancs rejoués sur le M1 au commit `d533e30`
+([pool](../results/d533e30/m1-air/benchstat-pool.txt),
+[séries](../results/d533e30/m1-air/bench-io.txt),
+[cycle](../results/d533e30/m1-air/cycle.txt)). Les deux étapes se séparent nettement.
+
+**Le recyclage de tampons ne survit pas au changement d'architecture.**
+
+| | Banc B (x86) | Banc A (M1) |
+|---|---:|---:|
+| `packed` 256²  | −13,2 % | non significatif (p = 0,851) |
+| `packed` 1024² | −6,3 % | **−1,9 %** (p = 0,002) |
+| `proto` 256²   | −21,6 % | non significatif (p = 0,180) |
+| `proto` 1024²  | non significatif | non significatif (p = 0,065) |
+
+Un seul des quatre cas garde un effet mesurable sur le banc A, et il est sept fois plus faible qu'en
+face. La réduction des allocations, elle, est identique sur les deux bancs — c'est bien le *temps*
+qui ne suit pas. Explication plausible, non instrumentée : le gain venait de la remise à zéro évitée
+et du travail du ramasse-miettes, deux coûts liés à la bande passante mémoire, dont le M1 dispose
+plus largement au regard de sa puissance de calcul. **`sync.Pool` est une optimisation dont le
+bénéfice dépend du matériel, pas du code.**
+
+**La déduplication, elle, est parfaitement portable — dans son échec comme dans son succès.**
+
+| Série de 201 snapshots, 128² | Banc B | Banc A |
+|---|---:|---:|
+| `packed`, cache de 32 | +73,6 % | **+51,7 %** |
+| `proto`, cache de 32  | −55,9 % | **−56,5 %** |
+
+Le seuil de cache reste 12, le taux de doublons reste 72,64 %, et le cycle de période 24 s'installe
+au même tour 429 : la dynamique de la simulation est déterministe et ne doit rien à l'architecture.
+L'inégalité de rentabilité se vérifie des deux côtés — l'empreinte coûte 41,24 µs sur le banc A en
+128² contre une écriture `packed` à 33,2 µs et une écriture `proto` à 258 µs. Le verdict est donc le
+même sur les deux machines, ce qui le rend nettement plus solide que s'il n'avait été établi qu'une
+fois.
+
 **Réserves.** La série est mesurée en 128² parce qu'elle est conservée en mémoire ; la période 24 et
 le tour d'entrée 429 sont propres à cette taille et à la graine 42. Rien ne garantit qu'une autre
 carte donne la même période — et c'est justement pourquoi la taille du cache ne peut pas être fixée
@@ -1257,7 +1294,8 @@ une fois pour toutes.
 
 #### À venir
 
-- Rien au-delà de I/O-5 pour cet axe.
+**L'axe I/O est clos.** Les cinq étapes sont implémentées, mesurées sur les deux bancs et
+confrontées à leurs hypothèses ; aucune suite n'est prévue.
 
 ---
 
