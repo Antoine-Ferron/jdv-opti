@@ -4,11 +4,12 @@ SIZE  ?= 1024
 TURNS ?= 500
 FIRES ?= 64
 ADDR  ?= 127.0.0.1:8081
+DSN   ?= postgres://wildfire:wildfire@localhost:5432/wildfire?sslmode=disable
 BANC  ?= $(shell uname -s)-$(shell uname -m)
 COMMIT := $(shell git log -1 --format=%h -- internal cmd go.mod Makefile scripts)
 PROF  := results/$(COMMIT)/$(BANC)/profiles
 
-.PHONY: help build test env bench quick demo web profile flame layout escape proto tools clean
+.PHONY: help build test env bench quick demo web profile flame layout escape proto db db-stop tools clean
 
 help: ## Affiche cette aide
 	@grep -E '^[a-z]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-9s %s\n", $$1, $$2}'
@@ -60,3 +61,9 @@ web: ## Lance la carte interactive (ADDR=0.0.0.0:8081 pour y accéder depuis Win
 proto: ## Régénère le code Protobuf (protoc + protoc-gen-go requis)
 	protoc --proto_path=internal/snapshot --go_out=. --go_opt=module=gol-wildfire \
 		internal/snapshot/snapshot.proto
+
+db: ## Démarre PostgreSQL (axe I/O) et attend qu'il réponde
+	docker compose up -d --wait
+
+db-stop: ## Arrête PostgreSQL et jette les données
+	docker compose down -v

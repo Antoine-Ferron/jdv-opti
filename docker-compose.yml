@@ -1,0 +1,34 @@
+# Base de l'axe I/O (§3.3 du rapport) : historique des tours, index, EXPLAIN ANALYZE.
+#
+# Volontairement sans volume : chaque `make db` repart d'une base vide, ce qui
+# rend les mesures reproductibles — un index mesuré sur une table dont on ignore
+# le contenu ne prouve rien. Les données de mesure se régénèrent en quelques
+# secondes, les conserver n'apporterait que de l'incertitude.
+#
+#   make db       démarre la base et attend qu'elle réponde
+#   make db-stop  l'arrête et jette les données
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: wildfire-db
+    environment:
+      POSTGRES_USER: wildfire
+      POSTGRES_PASSWORD: wildfire
+      POSTGRES_DB: wildfire
+      # Les mesures portent sur les index et le groupage des insertions, pas sur
+      # la durabilité : désactiver fsync retire du bruit sans changer les plans
+      # d'exécution. À ne jamais faire en production, évidemment.
+      POSTGRES_INITDB_ARGS: "--nosync"
+    command: >
+      postgres
+      -c fsync=off
+      -c synchronous_commit=off
+      -c full_page_writes=off
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wildfire -d wildfire"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
