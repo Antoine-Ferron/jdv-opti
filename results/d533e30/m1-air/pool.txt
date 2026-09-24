@@ -1,0 +1,54 @@
+goos: darwin
+goarch: arm64
+pkg: gol-wildfire/internal/snapshot
+cpu: Apple M1
+BenchmarkPool/pool=false/format=packed/size=256-8         	    9115	    130509 ns/op	   98376 B/op	       5 allocs/op
+BenchmarkPool/pool=false/format=packed/size=256-8         	    8962	    130947 ns/op	   98376 B/op	       5 allocs/op
+BenchmarkPool/pool=false/format=packed/size=256-8         	    8900	    131134 ns/op	   98376 B/op	       5 allocs/op
+BenchmarkPool/pool=false/format=packed/size=256-8         	    8844	    136203 ns/op	   98376 B/op	       5 allocs/op
+BenchmarkPool/pool=false/format=packed/size=256-8         	    8785	    133302 ns/op	   98376 B/op	       5 allocs/op
+BenchmarkPool/pool=false/format=packed/size=256-8         	    8930	    137217 ns/op	   98376 B/op	       5 allocs/op
+BenchmarkPool/pool=true/format=packed/size=256-8          	    8872	    131482 ns/op	      79 B/op	       3 allocs/op
+BenchmarkPool/pool=true/format=packed/size=256-8          	    9189	    130898 ns/op	      79 B/op	       3 allocs/op
+BenchmarkPool/pool=true/format=packed/size=256-8          	    9136	    131134 ns/op	      79 B/op	       3 allocs/op
+BenchmarkPool/pool=true/format=packed/size=256-8          	    9076	    135713 ns/op	      79 B/op	       3 allocs/op
+BenchmarkPool/pool=true/format=packed/size=256-8          	    9013	    131913 ns/op	      79 B/op	       3 allocs/op
+BenchmarkPool/pool=true/format=packed/size=256-8          	    9244	    132561 ns/op	      79 B/op	       3 allocs/op
+BenchmarkPool/pool=false/format=proto/size=256-8          	    1090	   1083100 ns/op	 1319194 B/op	      11 allocs/op
+BenchmarkPool/pool=false/format=proto/size=256-8          	    1095	   1078786 ns/op	 1319194 B/op	      11 allocs/op
+BenchmarkPool/pool=false/format=proto/size=256-8          	    1098	   1079980 ns/op	 1319193 B/op	      11 allocs/op
+BenchmarkPool/pool=false/format=proto/size=256-8          	    1101	   1089419 ns/op	 1319194 B/op	      11 allocs/op
+BenchmarkPool/pool=false/format=proto/size=256-8          	    1088	   1102041 ns/op	 1319193 B/op	      11 allocs/op
+BenchmarkPool/pool=false/format=proto/size=256-8          	    1086	   1089623 ns/op	 1319193 B/op	      11 allocs/op
+BenchmarkPool/pool=true/format=proto/size=256-8           	    1150	   1039516 ns/op	     280 B/op	       6 allocs/op
+BenchmarkPool/pool=true/format=proto/size=256-8           	    1130	   1034996 ns/op	     280 B/op	       6 allocs/op
+BenchmarkPool/pool=true/format=proto/size=256-8           	    1152	   1085173 ns/op	     280 B/op	       6 allocs/op
+BenchmarkPool/pool=true/format=proto/size=256-8           	    1130	   1485965 ns/op	     280 B/op	       6 allocs/op
+BenchmarkPool/pool=true/format=proto/size=256-8           	    1134	   1044182 ns/op	     280 B/op	       6 allocs/op
+BenchmarkPool/pool=true/format=proto/size=256-8           	    1149	   1041667 ns/op	     280 B/op	       6 allocs/op
+BenchmarkPool/pool=false/format=packed/size=1024-8        	     564	   2102444 ns/op	 1572936 B/op	       5 allocs/op
+BenchmarkPool/pool=false/format=packed/size=1024-8        	     572	   2085454 ns/op	 1572936 B/op	       5 allocs/op
+BenchmarkPool/pool=false/format=packed/size=1024-8        	     573	   2088666 ns/op	 1572936 B/op	       5 allocs/op
+BenchmarkPool/pool=false/format=packed/size=1024-8        	     574	   2084185 ns/op	 1572937 B/op	       5 allocs/op
+BenchmarkPool/pool=false/format=packed/size=1024-8        	     572	   2089000 ns/op	 1572936 B/op	       5 allocs/op
+BenchmarkPool/pool=false/format=packed/size=1024-8        	     571	   2138119 ns/op	 1572937 B/op	       5 allocs/op
+BenchmarkPool/pool=true/format=packed/size=1024-8         	     574	   2046260 ns/op	    1898 B/op	       3 allocs/op
+BenchmarkPool/pool=true/format=packed/size=1024-8         	     586	   2056886 ns/op	    1861 B/op	       3 allocs/op
+BenchmarkPool/pool=true/format=packed/size=1024-8         	     579	   2050986 ns/op	    1883 B/op	       3 allocs/op
+BenchmarkPool/pool=true/format=packed/size=1024-8         	     584	   2047827 ns/op	    1867 B/op	       3 allocs/op
+BenchmarkPool/pool=true/format=packed/size=1024-8         	     512	   2048469 ns/op	    2120 B/op	       3 allocs/op
+BenchmarkPool/pool=true/format=packed/size=1024-8         	     585	   2054513 ns/op	    1864 B/op	       3 allocs/op
+BenchmarkPool/pool=false/format=proto/size=1024-8         	      64	  17232727 ns/op	20980011 B/op	      11 allocs/op
+BenchmarkPool/pool=false/format=proto/size=1024-8         	      66	  17106310 ns/op	20980005 B/op	      11 allocs/op
+BenchmarkPool/pool=false/format=proto/size=1024-8         	      63	  17188146 ns/op	20979999 B/op	      11 allocs/op
+BenchmarkPool/pool=false/format=proto/size=1024-8         	      69	  17217505 ns/op	20980008 B/op	      11 allocs/op
+BenchmarkPool/pool=false/format=proto/size=1024-8         	      66	  17318702 ns/op	20980003 B/op	      11 allocs/op
+BenchmarkPool/pool=false/format=proto/size=1024-8         	      66	  17371659 ns/op	20980007 B/op	      11 allocs/op
+BenchmarkPool/pool=true/format=proto/size=1024-8          	      70	  16647414 ns/op	     285 B/op	       6 allocs/op
+BenchmarkPool/pool=true/format=proto/size=1024-8          	      70	  16707513 ns/op	     285 B/op	       6 allocs/op
+BenchmarkPool/pool=true/format=proto/size=1024-8          	      69	  16761266 ns/op	     285 B/op	       6 allocs/op
+BenchmarkPool/pool=true/format=proto/size=1024-8          	      70	  17485726 ns/op	     280 B/op	       6 allocs/op
+BenchmarkPool/pool=true/format=proto/size=1024-8          	      69	  16790859 ns/op	     285 B/op	       6 allocs/op
+BenchmarkPool/pool=true/format=proto/size=1024-8          	      70	  16814214 ns/op	     280 B/op	       6 allocs/op
+PASS
+ok  	gol-wildfire/internal/snapshot	63.908s

@@ -1,0 +1,27 @@
+goos: darwin
+goarch: arm64
+pkg: gol-wildfire/internal/snapshot
+cpu: Apple M1
+                               │    false    │                true                │
+                               │   sec/op    │    sec/op     vs base              │
+Pool/format=packed/size=256-8    132.2µ ± 4%   131.7µ ±  3%       ~ (p=0.851 n=6)
+Pool/format=proto/size=256-8     1.086m ± 1%   1.043m ± 42%       ~ (p=0.180 n=6)
+Pool/format=packed/size=1024-8   2.089m ± 2%   2.050m ±  0%  -1.87% (p=0.002 n=6)
+Pool/format=proto/size=1024-8    17.23m ± 1%   16.78m ±  4%       ~ (p=0.065 n=6)
+geomean                          1.508m        1.474m        -2.22%
+
+                               │      false      │                 true                  │
+                               │      B/op       │     B/op       vs base                │
+Pool/format=packed/size=256-8      98376.00 ± 0%     79.00 ±  0%   -99.92% (p=0.002 n=6)
+Pool/format=proto/size=256-8      1319193.5 ± 0%     280.0 ±  0%   -99.98% (p=0.002 n=6)
+Pool/format=packed/size=1024-8   1536.070Ki ± 0%   1.831Ki ± 13%   -99.88% (p=0.002 n=6)
+Pool/format=proto/size=1024-8    20980006.0 ± 0%     285.0 ±  2%  -100.00% (p=0.002 n=6)
+geomean                             1.372Mi          329.7         -99.98%
+
+                               │    false    │               true                │
+                               │  allocs/op  │ allocs/op   vs base               │
+Pool/format=packed/size=256-8     5.000 ± 0%   3.000 ± 0%  -40.00% (p=0.002 n=6)
+Pool/format=proto/size=256-8     11.000 ± 0%   6.000 ± 0%  -45.45% (p=0.002 n=6)
+Pool/format=packed/size=1024-8    5.000 ± 0%   3.000 ± 0%  -40.00% (p=0.002 n=6)
+Pool/format=proto/size=1024-8    11.000 ± 0%   6.000 ± 0%  -45.45% (p=0.002 n=6)
+geomean                           7.416        4.243       -42.79%
