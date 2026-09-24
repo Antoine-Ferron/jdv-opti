@@ -18,9 +18,9 @@
 package engines
 
 import (
-	_ "gol-wildfire/internal/flat"  // étape 1 : grille plate, double tampon, tampon d'ignition réutilisé
-	_ "gol-wildfire/internal/naive" // baseline — ne plus modifier après les mesures de référence
-	// _ ".../counters"  // étape 2 : Burning incrémental — 21 % en front, 3-6 % en saturé.
+	_ "gol-wildfire/internal/counters" // étape 2 : Burning incrémental — 21 % en front, 3-6 % en saturé.
+	_ "gol-wildfire/internal/flat"     // étape 1 : grille plate, double tampon, tampon d'ignition réutilisé
+	_ "gol-wildfire/internal/naive"    // baseline — ne plus modifier après les mesures de référence
 	//                   //           La modification la moins coûteuse du lot, et le plus gros
 	//                   //           gisement encore ouvert sur le banc A.
 	// _ ".../ghost"     // étape 3 : bordure fantôme, plus aucun modulo — 7-9 % en saturé sur le

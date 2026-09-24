@@ -1,0 +1,53 @@
+Total: 4.71s
+ROUTINE ======================== gol-wildfire/internal/counters.(*Sim).Step in /Users/Cherif/Documents/Cours 26-27/Optimisations & Performances Backend/jdv-opti/internal/counters/counters.go
+     3.78s      4.69s (flat, cum) 99.58% of Total
+         .          .     61:func (s *Sim) Step() {
+         .          .     62:	ignite := s.ignite
+         .       10ms     63:	clear(ignite) // Les contagions ne survivent pas au tour courant.
+         .          .     64:	for y := 0; y < s.carte.Height; y++ {
+     140ms      140ms     65:		for x := 0; x < s.carte.Width; x++ {
+     340ms      350ms     66:			if s.grid[y*s.carte.Width+x].feu == 0 {
+         .          .     67:				continue
+         .          .     68:			}
+         .          .     69:			// Une case vent épargne son secteur amont et projette le feu deux
+         .          .     70:			// cases sous le vent, par-dessus ce qui s'y trouve (§5).
+     600ms      690ms     71:			d, vente := s.carte.WindAt(x, y)
+     360ms      360ms     72:			for j, v := range fire.Offsets {
+         .          .     73:				if vente {
+         .       20ms     74:					if secteur := fire.Mod(j-int(d), 8); secteur >= 3 && secteur <= 5 {
+         .          .     75:						continue
+         .          .     76:					}
+         .          .     77:				}
+     230ms      740ms     78:				ignite[s.carte.At(x+v[0], y+v[1])] = true
+         .          .     79:			}
+      10ms       10ms     80:			if vente {
+         .          .     81:				v := fire.Offsets[d]
+         .          .     82:				ignite[s.carte.At(x+2*v[0], y+2*v[1])] = true
+         .          .     83:			}
+         .          .     84:		}
+         .          .     85:	}
+         .          .     86:
+         .          .     87:	for y := 0; y < s.carte.Height; y++ {
+     100ms      100ms     88:		for x := 0; x < s.carte.Width; x++ {
+         .          .     89:			i := y*s.carte.Width + x
+     270ms      270ms     90:			terrain := s.carte.Terrain[i]
+      70ms       70ms     91:			c := s.grid[i]
+         .          .     92:			switch {
+         .          .     93:			case c.feu > 0:
+     290ms      290ms     94:				c.feu--
+         .          .     95:				if c.feu == 0 {
+      30ms       30ms     96:					c.repos = terrain.Repos()
+      50ms       50ms     97:					s.burning--
+         .          .     98:				}
+     330ms      350ms     99:			case c.repos > 0:
+     160ms      160ms    100:				c.repos--
+     370ms      600ms    101:			case ignite[i] && terrain.Combustion() > 0:
+         .          .    102:				c.feu = terrain.Combustion()
+     150ms      170ms    103:				s.burning++
+         .          .    104:			}
+     280ms      280ms    105:			s.next[i] = c // Écrire chaque cellule, y compris inactive : aucun état périmé.
+         .          .    106:		}
+         .          .    107:	}
+         .          .    108:	s.grid, s.next = s.next, s.grid
+         .          .    109:}
+         .          .    110:

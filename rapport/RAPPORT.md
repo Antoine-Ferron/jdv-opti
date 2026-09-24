@@ -689,6 +689,171 @@ tenu à jour dans `Step` suffit. Cela confirme l'étape `counters` prévue, et l
 > pas de sens, ces durées incluant l'échantillonnage et variant d'une exécution à l'autre. Les
 > comparaisons de temps viennent de benchstat et d'Hyperfine, pas d'ici.
 
+### Étape 2 — `counters` : nombre de cases en feu maintenu incrémentalement
+
+**Commit de code : `ae8b974`. Nature : macro-optimisation algorithmique.**
+`Burning()` passe d'un balayage O(N) à une lecture O(1), N étant le nombre de
+cases. `Step()` et un tour complet restent O(N). Cette étape part de `flat` ;
+`naive` et `firetest` ne sont pas modifiés.
+
+**Hypothèse d'impact matériel :** supprimer un parcours de la grille à chaque
+appel de `Burning` réduit les lectures mémoire et le travail CPU. Les profils
+précédents attribuent à ce parcours environ 21 % du CPU en front et 3–6 % en
+saturé sur M1. À coût restant inchangé, les plafonds théoriques sur la portion
+profilée sont donc ×1,27 et ×1,03–1,06. Ce ne sont pas des gains promis sur le
+programme complet : la génération de carte reste à payer et la mise à jour du
+compteur ajoute du travail à `Step`. Objectif mémoire : conserver 0 allocation/tour.
+
+**Modification :** initialiser le compteur avec les foyers réellement allumés,
+sans compter deux fois un foyer dupliqué ni compter l'eau ; incrémenter à
+l'allumage et décrémenter à l'extinction dans la transition existante. Les
+modulos, les tampons et le formatage de `Fingerprint` restent ceux de `flat`
+pour isoler l'effet du compteur.
+
+**Correction avant mesure :** `make test`, `make escape IMPL=counters` et
+`make quick IMPL=counters` passent. Les tests comparent les états et le compteur
+à `flat` sur 500 tours, ainsi que sur de petits tores, avec doublons et après
+extinction. Le test d'allocations confirme zéro allocation par `Step`.
+L'analyse d'échappement signale les allocations de construction, d'enregistrement
+et de `Fingerprint`, conservées intentionnellement ; cette dernière méthode
+n'est pas appelée par `fire.Run`. Aucun travail de padding dans cette étape.
+
+**Sources banc A :** [environnement](../results/ae8b974/m1-air/env.md),
+[tests](../results/ae8b974/m1-air/tests.txt),
+[benchstat](../results/ae8b974/m1-air/benchstat.txt),
+[mesures brutes](../results/ae8b974/m1-air/bench.txt).
+La campagne identifie le code `ae8b974`, sans avertissement de modifications
+non commitées : Apple M1, macOS 15.5, Go 1.27.1, darwin/arm64.
+
+**Commandes de mesure** (code commité, banc M1 de référence) :
+
+```bash
+make bench BANC=m1-air
+benchstat -col /impl results/ae8b974/m1-air/bench.txt
+make profile IMPL=counters BANC=m1-air
+make flame IMPL=counters BANC=m1-air
+hyperfine -N --warmup 3 --runs 12 \
+  --export-json results/ae8b974/m1-air/front50-hyperfine.json \
+  --export-markdown results/ae8b974/m1-air/front50-hyperfine.md \
+  -n "flat front" "./bin/wildfire -impl flat -size 1024 -turns 50 -fires 1 -quiet" \
+  -n "counters front" "./bin/wildfire -impl counters -size 1024 -turns 50 -fires 1 -quiet"
+```
+
+**Résultat banc A — microbenchmarks, 10 échantillons par version.** Le fichier
+benchstat place `counters` en première colonne : son « vs base » exprime donc
+`flat` relativement à `counters`. Ici, les variations sont recalculées dans
+le sens de l'optimisation, `(counters / flat - 1) × 100`, à partir des valeurs
+arrondies ; une valeur négative signifie moins de temps.
+
+| Mesure | `flat` | `counters` | Variation du temps | p-value |
+|---|---:|---:|---:|---:|
+| Step embrasement 256² | 767,1 µs | 780,9 µs | +1,8 % (régression) | < 0,001 |
+| Step embrasement 1024² | 9,997 ms | 9,984 ms | pas de différence significative | 0,971 |
+| Step embrasement 2048² | 24,00 ms | 23,91 ms | −0,4 % | 0,011 |
+| Run front 512² | 40,33 ms | 30,86 ms | −23,5 % | < 0,001 |
+| Run front 1024² | 160,7 ms | 122,1 ms | −24,0 % | < 0,001 |
+| Run embrasement 512² | 64,80 ms | 56,15 ms | −13,3 % | < 0,001 |
+| Run embrasement 1024² | 203,6 ms | 166,6 ms | −18,2 % | < 0,001 |
+
+`Run` inclut la construction du moteur et 50 tours au maximum, mais exclut la
+génération de carte. Il ne mesure donc pas le même périmètre que le binaire.
+Aucun gain significatif de construction (`New`) face à `flat` aux trois tailles.
+`Fingerprint`, non optimisé ici, reste à environ 24,5 ms et 451 200 allocations
+par appel ; son faible écart mesuré ne constitue pas le mécanisme de cette étape.
+
+**Mémoire :** `Step` conserve **0 B/op et 0 allocs/op** aux trois tailles.
+`Run` conserve 4 allocations et environ 5 Mio en 1024², comme `flat` : cette
+étape supprime des lectures de grille, pas un tampon. Le très faible supplément
+de stockage du compteur ne change pas ces valeurs arrondies. Il ne faut pas
+confondre octets alloués, mémoire résidente et trafic mémoire.
+
+**Résultat banc A — programme complet, génération comprise.** Sources :
+[Hyperfine 500 tours](../results/ae8b974/m1-air/hyperfine-stats.md) et
+[Hyperfine front 50 tours](../results/ae8b974/m1-air/front50-hyperfine.md).
+
+| Charge 1024² | Répétitions | `flat` (moyenne ± écart-type) | `counters` | Temps en moins | Accélération |
+|---|---:|---:|---:|---:|---:|
+| 64 foyers, 500 tours | 15 | 6,2987 ± 0,0211 s | 5,9433 ± 0,0364 s | 5,6 % | ×1,060 |
+| 1 foyer, 50 tours | 12 | 645,3 ± 8,7 ms | 604,9 ± 8,3 ms | 6,3 % | ×1,067 |
+
+En 500 tours, les CV sont de 0,3 % (`flat`) et 0,6 % (`counters`). En front,
+ils sont d'environ 1,4 % ; Hyperfine signale des valeurs atypiques pour
+`counters`, à conserver comme réserve. Ces résultats sont des gains observés
+sur cette campagne ; aucune p-value n'est fournie par ce résumé Hyperfine.
+La réduction de 24 % du microbenchmark Run/front ne doit donc pas être annoncée
+comme gain global : le binaire complet gagne environ 6,3 %, la génération de
+carte diluant l'effet. Sur 500 tours, `naive` prend 6,4003 s : le gain cumulé
+observé de `counters` face à la baseline est ×1,077 (7,1 % de temps en moins).
+
+**Profil CPU et explication physique.** Le
+[profil CPU](../results/ae8b974/m1-air/profiles/counters-cpu-top.txt)
+attribue 99,58 % des échantillons à `Step`, appels inclus, dont 80,25 % à son
+corps. `Burning` n'apparaît plus parmi les coûts visibles ; cela ne signifie
+pas un coût nul. `Mod` représente 7,43 % en cumul, inclus dans `Step` : ces
+pourcentages ne s'additionnent pas. Le résultat est cohérent avec la suppression
+du balayage de comptage ; aucune mesure directe de défauts de cache n'a été faite.
+
+![Profil CPU de counters sur M1, commit ae8b974](figures/m1-air/flame-cpu-counters.png)
+
+Le [profil alloc_space](../results/ae8b974/m1-air/profiles/counters-mem-top.txt)
+rapporte environ 81,06 Mo, essentiellement dans la génération de carte.
+Ce profil échantillonné d'allocations cumulées ne représente ni la mémoire
+résidente ni un total exact des allocations ; la preuve du zéro allocation par
+Step vient des tests et des microbenchmarks.
+
+**Résultat banc B — programme complet.** Même commit, même protocole. Sources :
+[environnement](../results/ae8b974/x86-controle/env.md),
+[tests](../results/ae8b974/x86-controle/tests.txt),
+[benchstat](../results/ae8b974/x86-controle/benchstat.txt),
+[Hyperfine 500 tours](../results/ae8b974/x86-controle/hyperfine-stats.md),
+[Hyperfine front 50 tours](../results/ae8b974/x86-controle/front50-hyperfine.md).
+
+| Charge 1024² | `flat` | `counters` | Temps en moins |
+|---|---:|---:|---:|
+| 64 foyers, 500 tours (15 répétitions) | 8,2896 ± 0,0858 s | 7,8076 ± 0,0579 s | **5,8 %** |
+| 1 foyer, 50 tours (12 répétitions) | 801,5 ± 13,9 ms | 775,7 ± 10,6 ms | 3,2 % |
+
+CV de 1,0 % et 0,7 % sur la charge à 500 tours. En embrasement, le banc B donne
+**5,8 %** contre 5,6 % sur le banc A : le gain est portable, ce qui n'allait pas
+de soi — c'est le premier changement du projet dont l'effet ne dépend pas de
+l'architecture.
+
+**Le chiffre de 3,2 % en front est trompeur, et d'un facteur sept.** À 50 tours,
+la mesure est dominée par la génération de carte. Mesuré directement, le binaire
+sans aucun tour coûte **683,1 ± 8,4 ms** sur ce banc, soit 88 % des 775,7 ms :
+la simulation ne pèse que ~93 ms. Rapporté à la seule simulation, le gain est de
+**21,8 %** (118,4 ms pour `flat` contre 92,6 ms), ce que confirme par une voie
+indépendante le microbenchmark `Run/front/1024`, qui donne −25,9 % sans passer
+par la génération.
+
+C'est le piège du §2.4, à l'envers : là où `BenchmarkRun` avait **surestimé**
+`flat` d'un facteur 3, Hyperfine **sous-estime** ici `counters` d'un facteur 7.
+Dans les deux cas la cause est la même — un périmètre de mesure qui n'est pas
+celui du changement. La formulation « le binaire complet gagne environ 6,3 % »
+retenue pour le banc A appelle la même correction ; il suffit pour cela d'y
+mesurer `./bin/wildfire -impl counters -size 1024 -turns 0 -fires 1 -quiet`.
+
+**Portabilité du gain en front.** Le banc A gagne 6,3 % et le banc B 3,2 % sur
+la même charge diluée. L'écart est cohérent avec les profils : sur le banc B,
+`Map.At` et `Map.WindAt` pèsent 46,4 % et 20,7 % en cumul
+([profil](../results/ae8b974/x86-controle/profiles/counters-cpu-top.txt)),
+contre 7,4 % pour `Mod` sur le banc A. Supprimer le balayage de `Burning` retire
+donc la même quantité de travail absolu, mais une part plus faible d'un total
+plus lourd. Le coût de l'enroulement torique reste le poste dominant du banc B,
+et l'étape `ghost` le vise directement.
+
+**Réserve — `naive` n'est pas la plus lente sur ce banc.** Hyperfine à 500 tours
+donne `naive` à 8,1949 s, soit **plus rapide que `flat`** (8,2896 s). Ce n'est
+pas une surprise : le §4 documente déjà la régression de `flat` en embrasement.
+Le gain cumulé de `counters` face à la baseline est donc de 4,7 % sur le banc B,
+contre 7,1 % sur le banc A. La colonne « Accélération » du résumé Hyperfine est
+calculée par rapport à la première ligne du fichier, ici `counters` : elle se lit
+à l'envers et ne doit pas être reprise telle quelle.
+
+**Décision :** conserver l'étape pour ses gains sur les scénarios complets,
+tout en documentant la régression locale de Step en 256² au §4. Le gain vient
+de `Burning`, pas d'une accélération systématique de `Step`.
+
 ### 3.1 Mémoire & localité de cache
 
 - Grille plate `[]uint8` + double tampon, et tampon d'ignition réutilisé : zéro allocation par tour.
@@ -979,6 +1144,21 @@ du temps CPU ni du pic de mémoire.
 **Retour arrière :** aucun revert effectué à ce stade. La version et ses
 résultats sont conservés pour la comparaison ; la variante reste à implémenter
 et à mesurer avant de décider de la version à retenir.
+
+### Compromis mesuré — `counters` en petite grille
+
+La campagne [ae8b974 sur M1](../results/ae8b974/m1-air/benchstat.txt) montre
+une régression de `Step` en 256² : 767,1 µs (`flat`) → 780,9 µs (`counters`),
+soit environ +1,8 %, p < 0,001. La maintenance du compteur ajoute du travail
+aux transitions, explication plausible de ce coût local, sans preuve matérielle
+isolée. En 1024², l'écart de Step n'est pas significatif (p = 0,971).
+L'étape est conservée car les mesures de Run et du binaire complet montrent un
+gain : il s'agit d'un compromis local documenté, pas d'une accélération de tous
+les chemins. Aucun revert n'est effectué ; si cette étape est abandonnée, elle
+sera annulée par revert en conservant ces mesures dans l'historique.
+
+Le banc B ne reproduit pas cette régression : en 256², `Step` y donne 1,045 ms
+pour les deux versions (p = 0,393). Le compromis est donc propre au banc A.
 
 ### Hypothèse partiellement réfutée — le seuil de rentabilité d'un index
 

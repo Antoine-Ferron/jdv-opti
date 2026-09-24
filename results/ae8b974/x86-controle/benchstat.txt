@@ -1,0 +1,135 @@
+goos: linux
+goarch: amd64
+pkg: gol-wildfire/internal/bench
+cpu: Intel(R) Core(TM) Ultra 9 275HX
+                                                │   counters   │                 flat                  │                 naive                  │                     │
+                                                │    sec/op    │    sec/op      vs base                │    sec/op      vs base                 │    sec/op     vs base   │
+Step/scenario=embrasement/size=256-24             1.045m ±  2%    1.045m ±  3%        ~ (p=0.393 n=10)    1.089m ±  1%    +4.21% (p=0.000 n=10)
+Step/scenario=embrasement/size=1024-24            12.44m ±  2%    12.31m ±  1%        ~ (p=0.529 n=10)    12.57m ±  1%         ~ (p=0.190 n=10)
+Step/scenario=embrasement/size=2048-24            30.16m ±  6%    30.14m ±  6%        ~ (p=0.912 n=10)    30.62m ±  1%    +1.52% (p=0.019 n=10)
+Fingerprint/size=1024-24                          19.97m ±  2%    19.94m ±  2%        ~ (p=0.912 n=10)    20.07m ±  3%         ~ (p=0.631 n=10)
+Run/scenario=front/size=512-24                    22.65m ±  1%    29.15m ±  3%  +28.67% (p=0.000 n=10)    71.72m ±  6%  +216.57% (p=0.000 n=10)
+Run/scenario=front/size=1024-24                   83.91m ±  1%   113.24m ±  2%  +34.94% (p=0.000 n=10)   275.45m ± 18%  +228.25% (p=0.000 n=10)
+Run/scenario=embrasement/size=512-24              61.60m ±  1%    67.96m ±  1%  +10.31% (p=0.000 n=10)    70.31m ±  1%   +14.14% (p=0.000 n=10)
+Run/scenario=embrasement/size=1024-24             155.2m ±  4%    182.5m ±  1%  +17.59% (p=0.000 n=10)    192.0m ±  2%   +23.73% (p=0.000 n=10)
+New/size=256-24                                   39.22µ ± 17%    24.62µ ±  5%  -37.21% (p=0.000 n=10)    31.75µ ±  2%   -19.03% (p=0.000 n=10)
+New/size=1024-24                                  522.9µ ±  6%    477.3µ ± 11%   -8.72% (p=0.005 n=10)    315.2µ ±  4%   -39.71% (p=0.000 n=10)
+New/size=2048-24                                  1.313m ±  8%    1.207m ±  9%   -8.08% (p=0.007 n=10)    1.048m ±  2%   -20.16% (p=0.000 n=10)
+SnapshotWrite/format=json/size=256-24                                                                                                             29.22m ±  6%
+SnapshotWrite/format=packed/size=256-24                                                                                                           89.78µ ±  1%
+SnapshotWrite/format=proto/size=256-24                                                                                                            904.6µ ±  1%
+SnapshotWrite/format=json/size=1024-24                                                                                                            534.7m ± 28%
+SnapshotWrite/format=packed/size=1024-24                                                                                                          1.338m ±  1%
+SnapshotWrite/format=proto/size=1024-24                                                                                                           13.84m ±  3%
+SnapshotPacked/variante=avec-decor/size=1024-24                                                                                                   1.356m ±  1%
+SnapshotPacked/variante=sans-decor/size=1024-24                                                                                                   849.4µ ±  1%
+SnapshotRead/format=json/size=1024-24                                                                                                             523.5m ±  2%
+SnapshotRead/format=packed/size=1024-24                                                                                                           1.746m ±  5%
+SnapshotRead/format=proto/size=1024-24                                                                                                            9.445m ±  1%
+geomean                                           7.434m          7.542m         +1.45%                   8.768m         +17.94%                  5.765m        ? ¹ ²
+¹ benchmark set differs from baseline; geomeans may not be comparable
+² ratios must be >0 to compute geomean
+
+                                                │   counters   │                flat                 │                naive                │                      │
+                                                │     B/s      │     B/s       vs base               │     B/s       vs base               │      B/s       vs base   │
+Step/scenario=embrasement/size=256-24             59.79Mi ± 2%   59.81Mi ± 3%       ~ (p=0.403 n=10)   57.37Mi ± 1%  -4.04% (p=0.000 n=10)
+Step/scenario=embrasement/size=1024-24            80.37Mi ± 2%   81.21Mi ± 1%       ~ (p=0.529 n=10)   79.55Mi ± 1%       ~ (p=0.190 n=10)
+Step/scenario=embrasement/size=2048-24            132.6Mi ± 6%   132.7Mi ± 6%       ~ (p=0.869 n=10)   130.7Mi ± 1%  -1.50% (p=0.019 n=10)
+SnapshotWrite/format=json/size=256-24                                                                                                        244.1Mi ±  5%
+SnapshotWrite/format=packed/size=256-24                                                                                                      1.020Gi ±  1%
+SnapshotWrite/format=proto/size=256-24                                                                                                       276.4Mi ±  1%
+SnapshotWrite/format=json/size=1024-24                                                                                                       214.8Mi ± 40%
+SnapshotWrite/format=packed/size=1024-24                                                                                                     1.095Gi ±  1%
+SnapshotWrite/format=proto/size=1024-24                                                                                                      289.0Mi ±  2%
+SnapshotPacked/variante=avec-decor/size=1024-24                                                                                              1.080Gi ±  1%
+SnapshotPacked/variante=sans-decor/size=1024-24                                                                                              588.7Mi ±  1%
+SnapshotRead/format=json/size=1024-24                                                                                                        219.3Mi ±  2%
+SnapshotRead/format=packed/size=1024-24                                                                                                      859.2Mi ±  4%
+SnapshotRead/format=proto/size=1024-24                                                                                                       423.5Mi ±  1%
+geomean                                           86.06Mi        86.38Mi       +0.38%                  84.17Mi       -2.19%                  471.3Mi        ? ¹ ²
+¹ benchmark set differs from baseline; geomeans may not be comparable
+² ratios must be >0 to compute geomean
+
+                                                │    counters     │                  flat                  │                 naive                  │                      │
+                                                │      B/op       │     B/op       vs base                 │     B/op       vs base                 │     B/op       vs base   │
+Step/scenario=embrasement/size=256-24               0.00Ki ± 0%       0.00Ki ± 0%       ~ (p=1.000 n=10) ¹    64.00Ki ± 0%         ? (p=0.000 n=10)
+Step/scenario=embrasement/size=1024-24             0.000Mi ± 0%      0.000Mi ± 0%       ~ (p=1.000 n=10) ¹    1.000Mi ± 0%         ? (p=0.000 n=10)
+Step/scenario=embrasement/size=2048-24             0.000Mi ± 0%      0.000Mi ± 0%       ~ (p=1.000 n=10) ¹    4.000Mi ± 0%         ? (p=0.000 n=10)
+Fingerprint/size=1024-24                           16.83Mi ± 0%      16.83Mi ± 0%       ~ (p=0.782 n=10)      16.83Mi ± 0%    +0.01% (p=0.000 n=10)
+Run/scenario=front/size=512-24                     1.250Mi ± 0%      1.250Mi ± 0%       ~ (p=0.136 n=10)     13.013Mi ± 0%  +940.91% (p=0.000 n=10)
+Run/scenario=front/size=1024-24                    5.000Mi ± 0%      5.000Mi ± 0%       ~ (p=0.780 n=10)     52.026Mi ± 0%  +940.48% (p=0.000 n=10)
+Run/scenario=embrasement/size=512-24               1.250Mi ± 0%      1.250Mi ± 0%       ~ (p=0.146 n=10)     13.013Mi ± 0%  +940.90% (p=0.000 n=10)
+Run/scenario=embrasement/size=1024-24              5.000Mi ± 0%      5.000Mi ± 0%       ~ (p=0.467 n=10)     52.026Mi ± 0%  +940.49% (p=0.000 n=10)
+New/size=256-24                                    320.2Ki ± 0%      320.2Ki ± 0%  -0.00% (p=0.000 n=10)      134.5Ki ± 0%   -58.00% (p=0.000 n=10)
+New/size=1024-24                                   5.000Mi ± 0%      5.000Mi ± 0%  -0.00% (p=0.000 n=10)      2.026Mi ± 0%   -59.48% (p=0.000 n=10)
+New/size=2048-24                                  20.000Mi ± 0%     20.000Mi ± 0%  -0.00% (p=0.000 n=10)      8.047Mi ± 0%   -59.77% (p=0.000 n=10)
+SnapshotWrite/format=json/size=256-24                                                                                                                 63.17Mi ± 10%
+SnapshotWrite/format=packed/size=256-24                                                                                                               96.02Ki ±  0%
+SnapshotWrite/format=proto/size=256-24                                                                                                                1.258Mi ±  0%
+SnapshotWrite/format=json/size=1024-24                                                                                                                1.092Gi ± 27%
+SnapshotWrite/format=packed/size=1024-24                                                                                                              1.500Mi ±  0%
+SnapshotWrite/format=proto/size=1024-24                                                                                                               20.01Mi ±  0%
+SnapshotPacked/variante=avec-decor/size=1024-24                                                                                                       1.500Mi ±  0%
+SnapshotPacked/variante=sans-decor/size=1024-24                                                                                                       512.0Ki ±  0%
+SnapshotRead/format=json/size=1024-24                                                                                                                 498.8Mi ±  0%
+SnapshotRead/format=packed/size=1024-24                                                                                                               5.500Mi ±  0%
+SnapshotRead/format=proto/size=1024-24                                                                                                                29.54Mi ±  0%
+geomean                                                         ²                  -0.00%                ²    3.994Mi       ?                         8.426Mi        ? ³ ⁴
+¹ all samples are equal
+² summaries must be >0 to compute geomean
+³ benchmark set differs from baseline; geomeans may not be comparable
+⁴ ratios must be >0 to compute geomean
+
+                                                │   counters    │                 flat                 │                  naive                   │                    │
+                                                │   allocs/op   │  allocs/op   vs base                 │   allocs/op    vs base                   │  allocs/op   vs base   │
+Step/scenario=embrasement/size=256-24              0.000 ± 0%      0.000 ± 0%       ~ (p=1.000 n=10) ¹      1.000 ± 0%           ? (p=0.000 n=10)
+Step/scenario=embrasement/size=1024-24             0.000 ± 0%      0.000 ± 0%       ~ (p=1.000 n=10) ¹      1.000 ± 0%           ? (p=0.000 n=10)
+Step/scenario=embrasement/size=2048-24             0.000 ± 0%      0.000 ± 0%       ~ (p=1.000 n=10) ¹      1.000 ± 0%           ? (p=0.000 n=10)
+Fingerprint/size=1024-24                          451.2k ± 0%     451.2k ± 0%       ~ (p=1.000 n=10)       451.2k ± 0%      +0.00% (p=0.000 n=10)
+Run/scenario=front/size=512-24                     4.000 ± 0%      4.000 ± 0%       ~ (p=1.000 n=10) ¹    564.000 ± 0%  +14000.00% (p=0.000 n=10)
+Run/scenario=front/size=1024-24                    4.000 ± 0%      4.000 ± 0%       ~ (p=1.000 n=10) ¹   1076.000 ± 0%  +26800.00% (p=0.000 n=10)
+Run/scenario=embrasement/size=512-24               4.000 ± 0%      4.000 ± 0%       ~ (p=1.000 n=10) ¹    564.000 ± 0%  +14000.00% (p=0.000 n=10)
+Run/scenario=embrasement/size=1024-24              4.000 ± 0%      4.000 ± 0%       ~ (p=1.000 n=10) ¹   1076.000 ± 0%  +26800.00% (p=0.000 n=10)
+New/size=256-24                                    4.000 ± 0%      4.000 ± 0%       ~ (p=1.000 n=10) ¹    258.000 ± 0%   +6350.00% (p=0.000 n=10)
+New/size=1024-24                                   4.000 ± 0%      4.000 ± 0%       ~ (p=1.000 n=10) ¹   1026.000 ± 0%  +25550.00% (p=0.000 n=10)
+New/size=2048-24                                   4.000 ± 0%      4.000 ± 0%       ~ (p=1.000 n=10) ¹   2050.000 ± 0%  +51150.00% (p=0.000 n=10)
+SnapshotWrite/format=json/size=256-24                                                                                                               43.50 ± 20%
+SnapshotWrite/format=packed/size=256-24                                                                                                             3.000 ±  0%
+SnapshotWrite/format=proto/size=256-24                                                                                                              6.000 ±  0%
+SnapshotWrite/format=json/size=1024-24                                                                                                              65.00 ± 80%
+SnapshotWrite/format=packed/size=1024-24                                                                                                            3.000 ±  0%
+SnapshotWrite/format=proto/size=1024-24                                                                                                             6.000 ±  0%
+SnapshotPacked/variante=avec-decor/size=1024-24                                                                                                     3.000 ±  0%
+SnapshotPacked/variante=sans-decor/size=1024-24                                                                                                     2.000 ±  0%
+SnapshotRead/format=json/size=1024-24                                                                                                               80.00 ±  0%
+SnapshotRead/format=packed/size=1024-24                                                                                                             9.000 ±  0%
+SnapshotRead/format=proto/size=1024-24                                                                                                              39.00 ±  0%
+geomean                                                       ²                +0.00%                ²      228.9       ?                           10.40        ? ³ ⁴
+¹ all samples are equal
+² summaries must be >0 to compute geomean
+³ benchmark set differs from baseline; geomeans may not be comparable
+⁴ ratios must be >0 to compute geomean
+
+                                                │             │
+                                                │   o/case    │
+SnapshotWrite/format=json/size=256-24              114.1 ± 0%
+SnapshotWrite/format=packed/size=256-24            1.500 ± 0%
+SnapshotWrite/format=proto/size=256-24             4.000 ± 0%
+SnapshotWrite/format=json/size=1024-24             114.8 ± 0%
+SnapshotWrite/format=packed/size=1024-24           1.500 ± 0%
+SnapshotWrite/format=proto/size=1024-24            4.000 ± 0%
+SnapshotPacked/variante=avec-decor/size=1024-24    1.500 ± 0%
+SnapshotPacked/variante=sans-decor/size=1024-24   500.0m ± 0%
+geomean                                            4.938
+
+                                                │             │
+                                                │ o/snapshot  │
+SnapshotWrite/format=json/size=256-24             7.480M ± 0%
+SnapshotWrite/format=packed/size=256-24           98.32k ± 0%
+SnapshotWrite/format=proto/size=256-24            262.2k ± 0%
+SnapshotWrite/format=json/size=1024-24            120.4M ± 0%
+SnapshotWrite/format=packed/size=1024-24          1.573M ± 0%
+SnapshotWrite/format=proto/size=1024-24           4.194M ± 0%
+SnapshotPacked/variante=avec-decor/size=1024-24   1.573M ± 0%
+SnapshotPacked/variante=sans-decor/size=1024-24   524.3k ± 0%
+geomean                                           1.831M
