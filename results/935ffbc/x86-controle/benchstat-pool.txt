@@ -1,0 +1,27 @@
+goos: linux
+goarch: amd64
+pkg: gol-wildfire/internal/snapshot
+cpu: Intel(R) Core(TM) Ultra 9 275HX
+                                │    false    │                true                │
+                                │   sec/op    │   sec/op     vs base               │
+Pool/format=packed/size=256-24    86.54µ ± 5%   75.12µ ± 2%  -13.19% (p=0.002 n=6)
+Pool/format=proto/size=256-24     877.3µ ± 4%   687.8µ ± 4%  -21.60% (p=0.002 n=6)
+Pool/format=packed/size=1024-24   1.338m ± 4%   1.254m ± 2%   -6.27% (p=0.002 n=6)
+Pool/format=proto/size=1024-24    15.50m ± 8%   15.21m ± 4%        ~ (p=0.240 n=6)
+geomean                           1.120m        996.4µ       -11.04%
+
+                                │      false      │                 true                 │
+                                │      B/op       │     B/op      vs base                │
+Pool/format=packed/size=256-24      98376.00 ± 0%     76.00 ± 1%   -99.92% (p=0.002 n=6)
+Pool/format=proto/size=256-24      1319198.0 ± 0%     280.0 ± 0%   -99.98% (p=0.002 n=6)
+Pool/format=packed/size=1024-24   1536.072Ki ± 0%   1.115Ki ± 3%   -99.93% (p=0.002 n=6)
+Pool/format=proto/size=1024-24    20979999.5 ± 0%     280.0 ± 0%  -100.00% (p=0.002 n=6)
+geomean                              1.372Mi          287.2        -99.98%
+
+                                │    false    │               true                │
+                                │  allocs/op  │ allocs/op   vs base               │
+Pool/format=packed/size=256-24     5.000 ± 0%   3.000 ± 0%  -40.00% (p=0.002 n=6)
+Pool/format=proto/size=256-24     11.000 ± 0%   6.000 ± 0%  -45.45% (p=0.002 n=6)
+Pool/format=packed/size=1024-24    5.000 ± 0%   3.000 ± 0%  -40.00% (p=0.002 n=6)
+Pool/format=proto/size=1024-24    11.000 ± 0%   6.000 ± 0%  -45.45% (p=0.002 n=6)
+geomean                            7.416        4.243       -42.79%

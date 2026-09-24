@@ -1151,6 +1151,93 @@ comparant à la dernière empreinte. Un LRU n'apporte quelque chose que s'il exi
 période supérieure. La structure retenue sera celle que la mesure justifie : si une entrée capte
 tous les doublons observés, le LRU est de la complexité sans contrepartie, et sera écarté au §4.
 
+##### Confrontation à la mesure
+
+Mesures au commit `935ffbc`, banc B ([env.md](../results/935ffbc/x86-controle/env.md)). Sources :
+[pool](../results/935ffbc/x86-controle/benchstat-pool.txt),
+[séries](../results/935ffbc/x86-controle/benchstat-serie.txt),
+[cycle](../results/935ffbc/x86-controle/cycle.txt).
+
+**Hypothèse I/O-5 A — confirmée, et sous-estimée.** Le gain annoncé était « quelques pour cent,
+possiblement nul » ; il va jusqu'à 21,6 %.
+
+| Format et taille | Sans pool | Avec pool | Écart | p |
+|---|---:|---:|---:|---:|
+| `packed` 256²  | 86,54 µs | 75,12 µs | **−13,2 %** | 0,002 |
+| `packed` 1024² | 1,338 ms | 1,254 ms | **−6,3 %** | 0,002 |
+| `proto` 256²   | 877,3 µs | 687,8 µs | **−21,6 %** | 0,002 |
+| `proto` 1024²  | 15,50 ms | 15,21 ms | non significatif | 0,240 |
+
+Les allocations chutent de plus de 99,9 % dans les quatre cas — 1,50 Mio à 1,12 Kio par snapshot
+pour `packed` en 1024², 21,0 Mo à 280 o pour `proto` — et le nombre d'allocations passe de 5 à 3 et
+de 11 à 6. Les trois restantes sont les pointeurs rangés dans les pots, plus les reprises
+occasionnelles après un passage du ramasse-miettes, qui vide les `sync.Pool`.
+
+Deux points méritent d'être relevés plutôt que passés sous silence. D'abord, **le gain diminue quand
+la taille augmente**, jusqu'à disparaître pour `proto` en 1024². Explication plausible, non
+instrumentée : au-delà d'un certain volume Go sert les allocations depuis des pages neuves du
+système, déjà nulles, ce qui rend la remise à zéro évitée moins coûteuse qu'attendu ; et en 1024²
+`proto` est dominé par l'encodage varint de 20 Mo, devant lequel l'allocation ne pèse plus.
+
+Ensuite, ce résultat **contredit le précédent de l'étape 1** invoqué dans l'hypothèse, où zéro
+allocation s'accompagnait d'une régression. Les deux sont compatibles : `flat` réutilisait déjà ses
+tampons et n'a donc rien supprimé qui coûtait, là où l'on retire ici 1,5 Mio de mise à zéro et de
+déchets par appel. La leçon n'est pas que supprimer des allocations est bon ou mauvais, mais que
+**seule la mesure dit laquelle des deux situations on a sous les yeux**.
+
+**Hypothèse I/O-5 B — réfutée dans sa prémisse, puis dans sa conclusion.**
+
+*La prémisse d'abord.* L'hypothèse partait de l'extinction du feu. Elle n'arrive jamais : à 64², 128²
+et 256², avec un ou deux foyers, la simulation atteint 2 000 tours en brûlant toujours — les cases
+redeviennent combustibles après leur repos, et l'incendie s'auto-entretient.
+
+Les états se répètent pourtant, et massivement — mais pour une autre raison. En 128², la simulation
+parcourt **453 états distincts sur 2 001 tours** et entre au tour 429 dans un **cycle de période
+24**. Ce n'est pas un point fixe, c'est une orbite périodique.
+
+*La conséquence, que rien n'annonçait.* Le taux de doublons captés ne dépend plus seulement du
+cache, mais de l'**accord arithmétique entre la période d'échantillonnage et celle du cycle**. En
+relevant un snapshot tous les 10 tours pour une période de 24, deux états identiques sont distants
+de 120 tours, soit **12 relevés** : un cache de moins de 12 entrées ne peut structurellement rien
+voir. La mesure place le seuil exactement là.
+
+| Taille du cache | 1 | 8 | 12 | 16 | 32 |
+|---|---:|---:|---:|---:|---:|
+| Snapshots évités | 0 % | 0 % | **72,64 %** | 72,64 % | 72,64 % |
+
+C'est l'inverse de la sous-question posée avant l'implémentation, qui supposait qu'une seule entrée
+suffirait. **Une entrée ne capte rien du tout.** Le LRU n'est pas de la complexité superflue : il est
+nécessaire, et sa taille n'est pas un réglage de confort mais le quotient de deux périodes.
+
+*La conclusion ensuite.* Même en évitant 72,64 % des écritures, la déduplication ne paie pas pour
+tous les formats :
+
+| Série de 201 snapshots, 128² | Sans déduplication | Cache de 32 | Écart |
+|---|---:|---:|---:|
+| `proto`  | 31,97 ms | 14,09 ms | **−55,9 %** |
+| `packed` | 3,824 ms | 6,640 ms | **+73,6 %** |
+
+Même mécanisme, même taux de réussite, verdicts opposés. La raison est un simple rapport de coûts :
+l'empreinte revient à ~27 µs, une écriture `packed` à ~19 µs et une écriture `proto` à ~159 µs. La
+déduplication est rentable si et seulement si le test coûte moins que ce qu'il fait économiser, soit
+`coût(empreinte) < taux × coût(écriture)` : 27 < 0,73 × 159 pour `proto`, mais 27 > 0,73 × 19 pour
+`packed`.
+
+**Décision : la déduplication n'est pas activée par défaut.** Le format retenu à l'issue de l'axe est
+`packed`, précisément parce qu'il est le moins cher — et c'est cette qualité qui rend la
+déduplication perdante. Les deux optimisations de l'axe sont en tension : **plus le format est bon,
+moins il vaut la peine d'éviter de l'écrire.** Le code est conservé, paramétrable et mesuré, pour les
+formats coûteux où il divise le temps par deux.
+
+Le levier identifié, non mesuré : l'empreinte est un FNV-1a octet par octet, deux multiplications par
+case. Un hachage par mots de 64 bits irait plusieurs fois plus vite et pourrait renverser le verdict
+de `packed` — c'est la première chose à tenter si l'on veut rouvrir ce dossier.
+
+**Réserves.** La série est mesurée en 128² parce qu'elle est conservée en mémoire ; la période 24 et
+le tour d'entrée 429 sont propres à cette taille et à la graine 42. Rien ne garantit qu'une autre
+carte donne la même période — et c'est justement pourquoi la taille du cache ne peut pas être fixée
+une fois pour toutes.
+
 #### À venir
 
 - Rien au-delà de I/O-5 pour cet axe.
@@ -1230,6 +1317,42 @@ volume et index identiques.
 
 **Retour arrière :** aucun. L'index est conservé — la conclusion reste qu'il faut l'ajouter, seule
 la prévision chiffrée était fausse.
+
+### Optimisation écartée par la mesure — la déduplication des snapshots
+
+**Hypothèse I/O-5 B (§3.3, écrite avant le code) :** quand le feu s'éteint, l'état se fige ; ne pas
+réécrire un état déjà vu doit supprimer la sérialisation entière de ces snapshots, pour un gain
+supérieur à celui du recyclage de tampons. Un cache d'une seule entrée devait suffire, un point fixe
+étant un cycle de période 1.
+
+**Mesure :** trois erreurs, dont deux qui s'annulent presque.
+
+1. **Le feu ne s'éteint jamais.** À 64², 128² et 256², avec un ou deux foyers, la simulation brûle
+   encore au tour 2 000. Les cases redeviennent combustibles après leur repos.
+2. **Les états se répètent quand même**, par un mécanisme que l'hypothèse n'envisageait pas : une
+   orbite périodique. En 128², 453 états distincts sur 2 001 tours, cycle de période 24 installé au
+   tour 429.
+3. **Un cache d'une entrée ne capte rien** — 0 % de doublons, là où un cache de 12 en capte 72,64 %.
+   Avec un relevé tous les 10 tours et un cycle de 24, deux états identiques sont distants de
+   12 relevés : la profondeur nécessaire est le quotient de deux périodes, pas une préférence.
+
+**Et malgré 72,64 % d'écritures évitées, l'optimisation est perdante sur le format retenu :**
+`packed` passe de 3,824 ms à 6,640 ms pour une série de 201 snapshots (+73,6 %, p = 0,002), tandis
+que `proto` passe de 31,97 ms à 14,09 ms (−55,9 %). Source :
+[benchstat](../results/935ffbc/x86-controle/benchstat-serie.txt).
+
+**Explication :** le test coûte ~27 µs (empreinte FNV-1a), l'écriture qu'il évite ~19 µs en `packed`
+et ~159 µs en `proto`. Une déduplication n'est rentable que si `coût(test) < taux × coût(travail
+évité)`. Le format `packed` est trop bon pour qu'il vaille la peine d'éviter de l'écrire.
+
+**Enseignement :** deux optimisations d'un même axe peuvent se neutraliser. Les étapes I/O-1 à I/O-3
+ont rendu la sérialisation si peu coûteuse qu'elles ont retiré sa raison d'être à l'étape I/O-5. Une
+optimisation ne se juge pas dans l'absolu mais contre l'état du code au moment où on l'évalue —
+mesurée avant le format bit-packé, la déduplication aurait été un franc succès.
+
+**Retour arrière :** aucun revert. Le code est conservé, désactivé par défaut et paramétrable : il
+divise par deux le temps des formats coûteux, et ces mesures documentent la condition exacte de sa
+rentabilité.
 
 ### Autres pistes à explorer
 

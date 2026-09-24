@@ -1,0 +1,14 @@
+=== RUN   TestCycleDesEtats
+    cycle_test.go:58: 2001 tours, 453 états distincts, 1548 répétitions (77.4 %)
+    cycle_test.go:60: premier état répété au tour 453, identique au tour 429 — période 24
+    cycle_test.go:66: taux de doublons selon la période d'échantillonnage :
+    cycle_test.go:72:   toutes les  1 tours : 2001 relevés, 77.4 % évités
+    cycle_test.go:72:   toutes les  2 tours : 1001 relevés, 77.3 % évités
+    cycle_test.go:72:   toutes les  5 tours : 401 relevés, 72.6 % évités
+    cycle_test.go:72:   toutes les  7 tours : 286 relevés, 69.9 % évités
+    cycle_test.go:72:   toutes les 10 tours : 201 relevés, 72.6 % évités
+    cycle_test.go:72:   toutes les 25 tours :  81 relevés, 48.1 % évités
+    cycle_test.go:72:   toutes les 50 tours :  41 relevés, 48.8 % évités
+--- PASS: TestCycleDesEtats (0.69s)
+PASS
+ok  	gol-wildfire/internal/snapshot	0.696s
