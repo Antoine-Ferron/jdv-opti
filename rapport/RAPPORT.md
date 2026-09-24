@@ -620,6 +620,22 @@ binaire, lui, ne construit qu'une fois. Mesuré au CLI dans les mêmes condition
 `naive` est **2,7 fois plus lent au benchmark qu'au CLI**. L'écart est donc
 entièrement imputable à la reconstruction répétée, que seul le benchmark impose.
 
+**Et l'artefact est propre au banc B.** La même mesure sur le banc A
+([hyperfine](../results/1d3a093/m1-air/profiles/front50-hyperfine.md)) :
+
+| CLI, 1024², un foyer, 50 tours | naive | flat | Rapport |
+|---|---:|---:|---:|
+| Banc A (M1) | 641,6 ± 9,2 ms | 639,6 ± 7,0 ms | **1,00** |
+| Banc B (x86) | 900,3 ± 101,8 ms | 801,7 ± 8,9 ms | 1,12 |
+
+Sur le banc A, le benchmark et le binaire concordent — aucun écart des deux côtés,
+et une dispersion faible pour les deux moteurs. Reconstruire un millier de petits
+blocs n'y coûte donc rien de mesurable, là où cela suffit sur le banc B à faire
+apparaître un gain de ×3,4 qui n'existe pas. **Un même benchmark peut donc être
+fidèle sur une machine et trompeur sur une autre** : c'est un argument de plus
+pour mesurer sur deux bancs, au-delà de la seule question de la portabilité des
+gains.
+
 `BenchmarkNew` n'avait pas suffi à le voir : il mesure la construction **isolée**,
 en boucle serrée, où les objets sont recyclés immédiatement sans que le GC ait à
 les tracer. C'est une mesure juste qui répond à la mauvaise question.
