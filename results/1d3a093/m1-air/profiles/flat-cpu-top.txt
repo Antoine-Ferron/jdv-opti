@@ -1,0 +1,17 @@
+File: wildfire
+Type: cpu
+Time: 2026-09-24 09:46:43 CEST
+Duration: 5.85s, Total samples = 5.37s (91.85%)
+Showing nodes accounting for 5.34s, 99.44% of 5.37s total
+Dropped 2 nodes (cum <= 0.03s)
+      flat  flat%   sum%        cum   cum%
+     4.27s 79.52% 79.52%      5.04s 93.85%  gol-wildfire/internal/flat.(*Sim).Step
+     0.36s  6.70% 86.22%      0.36s  6.70%  gol-wildfire/internal/fire.Mod (inline)
+     0.33s  6.15% 92.36%      0.33s  6.15%  gol-wildfire/internal/flat.(*Sim).Burning
+     0.19s  3.54% 95.90%      0.55s 10.24%  gol-wildfire/internal/fire.Map.At (inline)
+     0.12s  2.23% 98.14%      0.12s  2.23%  gol-wildfire/internal/fire.Terrain.Combustion (inline)
+     0.07s  1.30% 99.44%      0.07s  1.30%  runtime.asyncPreempt
+         0     0% 99.44%      0.04s  0.74%  gol-wildfire/internal/fire.Map.WindAt (inline)
+         0     0% 99.44%      5.37s   100%  gol-wildfire/internal/fire.Run
+         0     0% 99.44%      5.37s   100%  main.main
+         0     0% 99.44%      5.37s   100%  runtime.main

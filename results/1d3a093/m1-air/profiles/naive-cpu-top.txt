@@ -1,0 +1,22 @@
+File: wildfire
+Type: cpu
+Time: 2026-09-24 09:46:21 CEST
+Duration: 5.75s, Total samples = 4.89s (85.04%)
+Showing nodes accounting for 4.89s, 100% of 4.89s total
+Showing top 15 nodes out of 17
+      flat  flat%   sum%        cum   cum%
+     3.73s 76.28% 76.28%      4.66s 95.30%  gol-wildfire/internal/naive.(*Sim).Step
+     0.45s  9.20% 85.48%      0.46s  9.41%  gol-wildfire/internal/fire.Mod (inline)
+     0.18s  3.68% 89.16%      0.63s 12.88%  gol-wildfire/internal/fire.Map.At (inline)
+     0.16s  3.27% 92.43%      0.16s  3.27%  gol-wildfire/internal/naive.(*Sim).Burning
+     0.14s  2.86% 95.30%      0.16s  3.27%  gol-wildfire/internal/fire.Terrain.Combustion (inline)
+     0.13s  2.66% 97.96%      0.13s  2.66%  runtime.asyncPreempt
+     0.07s  1.43% 99.39%      0.07s  1.43%  runtime.madvise
+     0.03s  0.61%   100%      0.03s  0.61%  gol-wildfire/internal/fire.Terrain.Repos (inline)
+         0     0%   100%      0.08s  1.64%  gol-wildfire/internal/fire.Map.WindAt (inline)
+         0     0%   100%      4.82s 98.57%  gol-wildfire/internal/fire.Run
+         0     0%   100%      4.82s 98.57%  main.main
+         0     0%   100%      0.07s  1.43%  runtime.(*mheap).alloc.func1
+         0     0%   100%      0.07s  1.43%  runtime.(*mheap).allocSpan
+         0     0%   100%      4.82s 98.57%  runtime.main
+         0     0%   100%      0.07s  1.43%  runtime.sysUsed (inline)

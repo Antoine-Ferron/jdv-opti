@@ -1,0 +1,14 @@
+File: wildfire
+Type: alloc_space
+Time: 2026-09-24 09:46:26 CEST
+Showing nodes accounting for 590.14MB, 99.28% of 594.44MB total
+Dropped 47 nodes (cum <= 2.97MB)
+      flat  flat%   sum%        cum   cum%
+     489MB 82.26% 82.26%      489MB 82.26%  gol-wildfire/internal/naive.(*Sim).Step
+      32MB  5.38% 87.65%       32MB  5.38%  gol-wildfire/internal/fire.champLisse
+   31.05MB  5.22% 92.87%    31.05MB  5.22%  gol-wildfire/internal/fire.quantile
+      24MB  4.04% 96.91%   102.14MB 17.18%  gol-wildfire/internal/fire.Generate
+   14.09MB  2.37% 99.28%    14.09MB  2.37%  gol-wildfire/internal/fire.tirage
+         0     0% 99.28%      489MB 82.26%  gol-wildfire/internal/fire.Run
+         0     0% 99.28%   594.37MB   100%  main.main
+         0     0% 99.28%   594.37MB   100%  runtime.main
