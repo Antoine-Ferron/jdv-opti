@@ -801,10 +801,54 @@ Ce profil échantillonné d'allocations cumulées ne représente ni la mémoire
 résidente ni un total exact des allocations ; la preuve du zéro allocation par
 Step vient des tests et des microbenchmarks.
 
-**Résultat banc B et portabilité : en attente.** Aucun résultat x86 pour
-`ae8b974` n'est présent dans cette campagne. Mesurer ce même commit et comparer
-les ratios `flat / counters` à charge identique ; aucune conclusion de
-portabilité n'est encore établie.
+**Résultat banc B — programme complet.** Même commit, même protocole. Sources :
+[environnement](../results/ae8b974/x86-controle/env.md),
+[tests](../results/ae8b974/x86-controle/tests.txt),
+[benchstat](../results/ae8b974/x86-controle/benchstat.txt),
+[Hyperfine 500 tours](../results/ae8b974/x86-controle/hyperfine-stats.md),
+[Hyperfine front 50 tours](../results/ae8b974/x86-controle/front50-hyperfine.md).
+
+| Charge 1024² | `flat` | `counters` | Temps en moins |
+|---|---:|---:|---:|
+| 64 foyers, 500 tours (15 répétitions) | 8,2896 ± 0,0858 s | 7,8076 ± 0,0579 s | **5,8 %** |
+| 1 foyer, 50 tours (12 répétitions) | 801,5 ± 13,9 ms | 775,7 ± 10,6 ms | 3,2 % |
+
+CV de 1,0 % et 0,7 % sur la charge à 500 tours. En embrasement, le banc B donne
+**5,8 %** contre 5,6 % sur le banc A : le gain est portable, ce qui n'allait pas
+de soi — c'est le premier changement du projet dont l'effet ne dépend pas de
+l'architecture.
+
+**Le chiffre de 3,2 % en front est trompeur, et d'un facteur sept.** À 50 tours,
+la mesure est dominée par la génération de carte. Mesuré directement, le binaire
+sans aucun tour coûte **683,1 ± 8,4 ms** sur ce banc, soit 88 % des 775,7 ms :
+la simulation ne pèse que ~93 ms. Rapporté à la seule simulation, le gain est de
+**21,8 %** (118,4 ms pour `flat` contre 92,6 ms), ce que confirme par une voie
+indépendante le microbenchmark `Run/front/1024`, qui donne −25,9 % sans passer
+par la génération.
+
+C'est le piège du §2.4, à l'envers : là où `BenchmarkRun` avait **surestimé**
+`flat` d'un facteur 3, Hyperfine **sous-estime** ici `counters` d'un facteur 7.
+Dans les deux cas la cause est la même — un périmètre de mesure qui n'est pas
+celui du changement. La formulation « le binaire complet gagne environ 6,3 % »
+retenue pour le banc A appelle la même correction ; il suffit pour cela d'y
+mesurer `./bin/wildfire -impl counters -size 1024 -turns 0 -fires 1 -quiet`.
+
+**Portabilité du gain en front.** Le banc A gagne 6,3 % et le banc B 3,2 % sur
+la même charge diluée. L'écart est cohérent avec les profils : sur le banc B,
+`Map.At` et `Map.WindAt` pèsent 46,4 % et 20,7 % en cumul
+([profil](../results/ae8b974/x86-controle/profiles/counters-cpu-top.txt)),
+contre 7,4 % pour `Mod` sur le banc A. Supprimer le balayage de `Burning` retire
+donc la même quantité de travail absolu, mais une part plus faible d'un total
+plus lourd. Le coût de l'enroulement torique reste le poste dominant du banc B,
+et l'étape `ghost` le vise directement.
+
+**Réserve — `naive` n'est pas la plus lente sur ce banc.** Hyperfine à 500 tours
+donne `naive` à 8,1949 s, soit **plus rapide que `flat`** (8,2896 s). Ce n'est
+pas une surprise : le §4 documente déjà la régression de `flat` en embrasement.
+Le gain cumulé de `counters` face à la baseline est donc de 4,7 % sur le banc B,
+contre 7,1 % sur le banc A. La colonne « Accélération » du résumé Hyperfine est
+calculée par rapport à la première ligne du fichier, ici `counters` : elle se lit
+à l'envers et ne doit pas être reprise telle quelle.
 
 **Décision :** conserver l'étape pour ses gains sur les scénarios complets,
 tout en documentant la régression locale de Step en 256² au §4. Le gain vient
