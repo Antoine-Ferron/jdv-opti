@@ -13,7 +13,7 @@ PROF  := results/$(COMMIT)/$(BANC)/profiles
 # Filtres des deux campagnes partielles. Les deux bancs doivent employer les
 # mêmes : des filtres divergents produisent des bench.txt qui n'ont plus les
 # mêmes lignes, et la comparaison A/B devient partielle sans qu'on le voie.
-BENCH_CPU ?= Step|Run|Fingerprint|New
+BENCH_CPU ?= Step|Run|Fingerprint|New|Empreinte
 BENCH_IO  ?= Snapshot|Store
 
 .PHONY: help build test env bench bench-cpu bench-io quick demo web profile flame layout escape proto db db-stop tools clean

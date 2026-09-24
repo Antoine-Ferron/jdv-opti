@@ -1354,6 +1354,38 @@ mesurée avant le format bit-packé, la déduplication aurait été un franc suc
 divise par deux le temps des formats coûteux, et ces mesures documentent la condition exacte de sa
 rentabilité.
 
+### Gain spectaculaire et sans effet — le hachage d'état
+
+L'étape I/O-5 avait besoin d'une empreinte d'état bon marché et s'est écrit la sienne, sans passer
+par `fire.Engine.Fingerprint`. La comparaison des deux, à grille identique en 1024²
+([banc](../results/935ffbc/x86-controle/empreinte.txt)), est sans appel :
+
+| | Temps | Alloué | Allocations |
+|---|---:|---:|---:|
+| `Engine.Fingerprint` — `fmt.Sprintf` par case puis SHA-256 | 18,64 ms | 17,6 Mo | 451 229 |
+| `State.Empreinte` — FNV-1a | **0,150 ms** | **0 o** | **0** |
+
+Soit **×124**, et la disparition de 451 229 allocations par appel. C'est le défaut `[F6]` de la
+baseline, recopié à l'identique dans `flat` puis dans `counters` : les trois implémentations
+partagent ce code.
+
+**Et pourtant ce gain ne changerait rien au programme.** `Fingerprint` n'est appelé que par
+`internal/firetest`, pour comparer deux moteurs entre eux, et par les bancs. Il n'apparaît ni dans
+`fire.Run` ni dans le binaire : l'optimiser accélérerait la suite de conformité et déplacerait la
+ligne `BenchmarkFingerprint` d'un facteur 124, sans retirer une seule microseconde à une exécution
+réelle.
+
+C'est le piège du §2.4 sous un troisième visage, et le plus dangereux des trois, parce que le chiffre
+est énorme. Une ligne de benchmark qui bouge de ×124 dans un tableau de synthèse se lit comme un
+succès majeur ; elle ne mesurerait ici que du code que personne n'exécute. **Un gain ne vaut que
+rapporté à la fréquence d'appel de ce qu'il accélère**, et cette fréquence est nulle sur le chemin
+chronométré.
+
+**Décision :** `Fingerprint` n'est pas modifié. Le remplaçant existe, mesuré, dans
+`snapshot.State.Empreinte` ; si l'axe CPU s'en empare un jour, ce sera pour la lisibilité de la
+baseline et la vitesse de la suite de tests, et le rapport devra dire explicitement que le gain
+n'atteint pas le programme.
+
 ### Autres pistes à explorer
 
 > **Tentative :** …
