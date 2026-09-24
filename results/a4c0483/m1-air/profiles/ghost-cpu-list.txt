@@ -1,0 +1,60 @@
+Total: 3.96s
+ROUTINE ======================== gol-wildfire/internal/ghost.(*Sim).Step in /Users/Cherif/Documents/Cours 26-27/Optimisations & Performances Backend/jdv-opti/internal/ghost/ghost.go
+     3.70s      3.96s (flat, cum)   100% of Total
+         .          .     78:func (s *Sim) Step() {
+         .          .     79:	ignite := s.ignite
+         .          .     80:	clear(ignite) // Les contagions ne survivent pas au tour courant.
+         .          .     81:	for y := 0; y < s.carte.Height; y++ {
+     170ms      190ms     82:		for x := 0; x < s.carte.Width; x++ {
+     390ms      400ms     83:			if s.grid[y*s.carte.Width+x].feu == 0 {
+         .          .     84:				continue
+         .          .     85:			}
+         .          .     86:			i := y*s.carte.Width + x
+     660ms      660ms     87:			center := (y+2)*s.stride + x + 2
+      50ms       50ms     88:			wind := s.carte.Wind[i]
+         .          .     89:			d := int(wind) - 1
+     240ms      260ms     90:			for j, offset := range s.offsets {
+         .          .     91:				if wind != 0 {
+         .          .     92:					sector := (j - d) & 7
+         .          .     93:					if sector >= 3 && sector <= 5 {
+         .          .     94:						continue
+         .          .     95:					}
+         .          .     96:				}
+     210ms      210ms     97:				ignite[center+offset] = true
+         .          .     98:			}
+      80ms       80ms     99:			if wind != 0 {
+         .          .    100:				ignite[center+2*s.offsets[d]] = true
+         .          .    101:			}
+         .          .    102:		}
+         .          .    103:	}
+         .          .    104:	// Plusieurs sources et coins peuvent viser la même case : fusion par OU.
+      10ms       10ms    105:	for _, pair := range s.border {
+         .          .    106:		if ignite[pair[0]] {
+         .          .    107:			ignite[pair[1]] = true
+         .          .    108:		}
+         .          .    109:	}
+         .          .    110:
+         .          .    111:	for y := 0; y < s.carte.Height; y++ {
+     110ms      110ms    112:		for x := 0; x < s.carte.Width; x++ {
+         .          .    113:			i := y*s.carte.Width + x
+     220ms      220ms    114:			terrain := s.carte.Terrain[i]
+      30ms       30ms    115:			c := s.grid[i]
+         .          .    116:			switch {
+      20ms       20ms    117:			case c.feu > 0:
+     280ms      280ms    118:				c.feu--
+      10ms       10ms    119:				if c.feu == 0 {
+      20ms       20ms    120:					c.repos = terrain.Repos()
+      50ms       60ms    121:					s.burning--
+         .          .    122:				}
+     210ms      220ms    123:			case c.repos > 0:
+     170ms      180ms    124:				c.repos--
+     350ms      520ms    125:			case ignite[(y+2)*s.stride+x+2] && terrain.Combustion() > 0:
+         .          .    126:				c.feu = terrain.Combustion()
+     140ms      150ms    127:				s.burning++
+         .          .    128:			}
+     280ms      280ms    129:			s.next[i] = c // Écrire chaque cellule, y compris inactive : aucun état périmé.
+         .          .    130:		}
+         .          .    131:	}
+         .          .    132:	s.grid, s.next = s.next, s.grid
+         .          .    133:}
+         .          .    134:

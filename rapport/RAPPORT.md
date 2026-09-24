@@ -854,6 +854,132 @@ calculée par rapport à la première ligne du fichier, ici `counters` : elle se
 tout en documentant la régression locale de Step en 256² au §4. Le gain vient
 de `Burning`, pas d'une accélération systématique de `Step`.
 
+### Étape 3 — `ghost` : propagation dans une bordure fantôme
+
+**Commit de code : `a4c0483`. Nature : optimisation mixte macro/micro.**
+Macro : organisation du tampon d'ignition avec une bordure de deux cases et une
+table de correspondances toriques. Micro : adressage par décalages précalculés,
+accès direct au vent et masque de direction. Le tour reste O(N).
+
+**Hypothèse préalable :** supprimer les modulos de propagation, représentant
+7–9 % du CPU dans les profils M1 précédents, pourrait apporter quelques
+pourcents en régime saturé. Si seul ce coût disparaissait, à reste inchangé,
+le plafond serait ×1,08–1,10 ; le traitement du halo réduit ce bénéfice potentiel.
+Objectif : conserver zéro allocation par Step. Aucun gain garanti en front.
+Cette hypothèse est consignée dans [le protocole ghost](../internal/ghost/README.md).
+
+**Modification :** partir de `counters`, conserver ses grilles et son compteur,
+et écrire les ignitions dans un halo de largeur 2 (nécessaire pour le saut du
+vent). Après propagation, fusionner par OU les ignitions de bordure vers leurs
+cibles intérieures, précalculées à la construction. `Step` n'appelle plus
+`Mod`, `Map.At` ni `Map.WindAt`. Le format de `Fingerprint` reste inchangé.
+Les versions précédentes et `firetest` sont conservées.
+
+**Correction :** `make test`, `make escape IMPL=ghost` et `make quick IMPL=ghost`
+passent. Les tests couvrent la conformité, la comparaison avec `counters`, les
+huit directions, les coins, les grilles de dimensions 1 et 2 et les largeurs
+non alignées. Le test d'allocations confirme zéro allocation par Step ; les
+échappements restants concernent la construction, l'enregistrement et le
+formatage hérité de Fingerprint, absent de `fire.Run`.
+
+**Sources :** [environnement](../results/a4c0483/m1-air/env.md),
+[tests](../results/a4c0483/m1-air/tests.txt),
+[benchstat](../results/a4c0483/m1-air/benchstat.txt),
+[mesures brutes](../results/a4c0483/m1-air/bench.txt).
+Le banc A est le M1, macOS 15.5, Go 1.27.1 darwin/arm64 ; le code mesuré est
+`a4c0483`, sans avertissement de modifications non commitées dans env.md.
+
+**Commandes**, après commit du code :
+
+```bash
+make bench-cpu BANC=m1-air
+make profile IMPL=ghost BANC=m1-air
+make flame IMPL=ghost BANC=m1-air
+hyperfine -N --warmup 3 --runs 12 \
+  --export-json results/a4c0483/m1-air/front50-hyperfine.json \
+  --export-markdown results/a4c0483/m1-air/front50-hyperfine.md \
+  -n "counters front" "./bin/wildfire -impl counters -size 1024 -turns 50 -fires 1 -quiet" \
+  -n "ghost front" "./bin/wildfire -impl ghost -size 1024 -turns 50 -fires 1 -quiet"
+```
+
+**Résultats banc A — microbenchmarks.** Comparaison à `counters` dans la même
+campagne, 10 échantillons par version. Les variations sont celles de benchstat ;
+une valeur négative signifie moins de temps. « p=0.000 » est transcrit p < 0,001.
+
+| Mesure | counters | ghost | Variation | p-value |
+|---|---:|---:|---:|---:|
+| Step embrasement 256² | 763,8 µs | 641,9 µs | −15,96 % | < 0,001 |
+| Step embrasement 1024² | 9,994 ms | 8,763 ms | −12,32 % | < 0,001 |
+| Step embrasement 2048² | 24,26 ms | 21,66 ms | −10,71 % | < 0,001 |
+| Run front 512² | 31,18 ms | 34,52 ms | +10,73 % | < 0,001 |
+| Run front 1024² | 124,9 ms | 136,2 ms | +9,05 % | < 0,001 |
+| Run embrasement 512² | 56,00 ms | 54,01 ms | −3,56 % | 0,011 |
+| Run embrasement 1024² | 167,9 ms | 168,4 ms | non significatif | 0,631 |
+| New 1024² | 183,4 µs | 1 052,1 µs | +473,56 % | < 0,001 |
+| Fingerprint 1024² | 24,82 ms | 25,14 ms | +1,31 % | 0,029 |
+
+La dispersion de Step/counters en 2048² atteint ±14 % : le gain y est
+statistiquement détecté, mais son ampleur est moins précisément estimée.
+`Run` construit le moteur et effectue au maximum 50 tours, sans génération de
+carte. Step est mesuré en régime établi. Ces charges ne sont pas interchangeables.
+Fingerprint régresse légèrement malgré un algorithme conservé ; la cause
+n'est pas isolée par cette campagne et cela n'affecte pas le chemin de Run.
+
+**Mémoire et construction :** Step reste à **0 B/op, 0 allocs/op** aux trois
+tailles. En 1024², New et Run passent d'environ **5,000 à 5,498 Mio alloués/op**
+(+9,95 %) et de **4 à 22 allocations/op**. Le halo et la croissance de la table
+par append ajoutent des allocations à la construction, pas à chaque tour.
+Ces octets cumulés ne mesurent pas la mémoire résidente. La construction passe
+à environ ×5,74 du temps de counters ; la préparation parcourt actuellement
+le rectangle complet pour sélectionner ses cases de bordure.
+
+**Programme complet — Hyperfine, carte 1024², génération comprise.** Sources :
+[500 tours](../results/a4c0483/m1-air/hyperfine-stats.md) et
+[front 50 tours](../results/a4c0483/m1-air/front50-hyperfine.md).
+
+| Charge | Répétitions | counters, moyenne ± écart-type | ghost, moyenne ± écart-type | Conclusion |
+|---|---:|---:|---:|---|
+| 64 foyers, 500 tours | 15 | 6,0687 ± 0,1033 s | 5,1173 ± 0,0641 s | −15,7 % observé, ×1,186 |
+| 1 foyer, 50 tours | 12 | 618,8 ± 22,5 ms | 607,3 ± 12,9 ms | −1,9 % observé, résultat non concluant |
+
+En saturé, CV de 1,7 % et 1,3 % ; face à naive mesuré dans cette même campagne
+(6,4647 s), le gain cumulé observé est ×1,263, soit 20,8 % de temps en moins.
+En front, CV d'environ 3,6 % et 2,1 %, et ratio Hyperfine ×1,02 ± 0,04 :
+aucun gain net n'est établi. Le résumé Hyperfine ne fournit pas de p-value ;
+on ne lui attribue pas celles des microbenchmarks. La génération de carte et
+la dispersion peuvent masquer des différences de simulation : ce résultat
+n'annule pas la régression significative de Run/front.
+
+**Profil et explication physique.** Le
+[profil CPU](../results/a4c0483/m1-air/profiles/ghost-cpu-top.txt) attribue
+93,43 % du CPU directement à Step, et 100 % avec ses appels. Mod, Map.At et
+Map.WindAt ne sont plus visibles, conformément à leur suppression dans Step.
+Les 3,96 s sont le total des échantillons CPU, pas le temps du programme.
+
+![Profil CPU de ghost sur M1, commit a4c0483](figures/m1-air/flame-cpu-ghost.png)
+
+Le gain dépasse l'estimation fondée sur Mod seul : cette transformation modifie
+aussi les calculs d'adresse, les accès au vent et les décalages des voisins.
+Le profil soutient ce mécanisme, sans isoler la contribution de chaque changement
+ni mesurer directement les défauts de cache. En front, peu de propagations
+profitent de ces économies, tandis que le halo doit toujours être effacé et
+replié. Ce surcoût est une explication plausible de la régression, en plus de
+la construction ; celle-ci seule n'explique pas les quelque 11 ms de différence
+sur Run/front/1024, son écart étant inférieur à 1 ms.
+
+Le [profil alloc_space](../results/a4c0483/m1-air/profiles/ghost-mem-top.txt)
+rapporte environ 81,06 Mo, surtout dans Generate. Ce profil échantillonné ne
+permet pas de conclure à une mémoire totale identique à counters : les mesures
+B/op exposent bien le surcoût de construction.
+
+**Banc B et portabilité : en attente.** Aucun dossier x86 n'est présent pour
+`a4c0483`. Comparer les ratios ghost/counters au même commit et avec le même
+filtre `make bench-cpu` ; le gain x86 supérieur envisagé reste une hypothèse.
+
+**Décision :** conserver cette variante comme étape favorable au régime saturé,
+avec sa régression en front explicitement documentée au §4. Aucun remplacement
+universel de counters n'est justifié par ces résultats.
+
 ### 3.1 Mémoire & localité de cache
 
 - Grille plate `[]uint8` + double tampon, et tampon d'ignition réutilisé : zéro allocation par tour.
@@ -1408,6 +1534,21 @@ mesurée avant le format bit-packé, la déduplication aurait été un franc suc
 **Retour arrière :** aucun revert. Le code est conservé, désactivé par défaut et paramétrable : il
 divise par deux le temps des formats coûteux, et ces mesures documentent la condition exacte de sa
 rentabilité.
+
+### Compromis mesuré — `ghost` dépend du régime de feu
+
+Source : [campagne a4c0483 sur M1](../results/a4c0483/m1-air/benchstat.txt).
+Le halo supprime les modulos mais impose un effacement et un repli des bords,
+même lorsque peu de cases brûlent. Run/front régresse de **10,73 % en 512²**
+et **9,05 % en 1024²**, p < 0,001. La construction en 1024² coûte environ
+×5,74 et alloue 5,498 Mio contre 5,000 Mio. Fingerprint présente également
+une petite régression mesurée (+1,31 %, p=0,029), sans cause isolée.
+
+Le gain global en saturé (−15,7 % observé sur 500 tours) justifie de conserver
+la variante pour ce régime. En front, Hyperfine est non concluant et ne réfute
+pas la régression de Run. Le critère de choix est donc la charge, pas seulement
+le nom de la version. Aucun revert n'est effectué ici ; si la variante est
+abandonnée, elle sera annulée par revert sans effacer cette campagne.
 
 ### Autres pistes à explorer
 

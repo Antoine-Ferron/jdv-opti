@@ -1,0 +1,12 @@
+File: wildfire
+Type: cpu
+Time: 2026-09-24 16:14:35 CEST
+Duration: 4.64s, Total samples = 3960ms (85.35%)
+Showing nodes accounting for 3960ms, 100% of 3960ms total
+      flat  flat%   sum%        cum   cum%
+    3700ms 93.43% 93.43%     3960ms   100%  gol-wildfire/internal/ghost.(*Sim).Step
+     150ms  3.79% 97.22%      150ms  3.79%  gol-wildfire/internal/fire.Terrain.Combustion (inline)
+     110ms  2.78%   100%      110ms  2.78%  runtime.asyncPreempt
+         0     0%   100%     3960ms   100%  gol-wildfire/internal/fire.Run
+         0     0%   100%     3960ms   100%  main.main
+         0     0%   100%     3960ms   100%  runtime.main
