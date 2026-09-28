@@ -226,7 +226,7 @@ machine** — c'est le résultat qui a structuré tout le plan d'optimisation :
 
 **2 — Division entière sur le chemin chaud.** Le modulo coûte 20 à 40 cycles et n'est pas
 vectorisable. Sur x86 il représente plus du tiers du temps ; sur ARM, dont le diviseur est plus
-rapide, moins du dixième. **Un même défaut de code ne pèse pas le même poids selon le silicium.**
+rapide, moins du dixième — **un rapport de 4 pour la même ligne de code.**
 
 **3 — Travail inutile en régime creux.** En scénario `front`, `Burning` recompte le million de cases
 à chaque tour pour n'en trouver que quelques centaines allumées.
@@ -372,9 +372,10 @@ quatre tris complets de `quantile` par un quickselect, O(n) au lieu de O(n log n
 
 **Ce que le projet établit au-delà de ses chiffres.**
 
-1. **Un défaut de code n'a pas le même poids selon le silicium.** Le modulo torique pèse 37 % du
-   profil sur x86 et 9 % sur ARM ; l'étape qui le supprime rend ×1,80 d'un côté, ×1,30 de l'autre.
-   Une seule machine aurait donné une conclusion fausse sur la valeur de cette optimisation.
+1. **La même ligne de code coûte quatre fois plus cher sur un processeur que sur l'autre.** Le modulo
+   torique pèse 37 % du profil sur x86 et 9 % sur ARM ; l'étape qui le supprime rend ×1,80 d'un côté
+   et ×1,30 de l'autre. Une seule machine aurait donné une conclusion fausse sur la valeur de cette
+   optimisation.
 2. **Les gains individuels ne sont pas portables, leur cumul l'est.** Chaque banc gagne là où l'autre
    avait moins à prendre, et les deux arrivent autour de ×11.
 3. **Aucune version n'est la meilleure dans les deux régimes.** V5 gagne ×3,1 sur grille creuse et
