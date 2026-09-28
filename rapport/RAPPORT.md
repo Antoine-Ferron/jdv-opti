@@ -1128,9 +1128,47 @@ un pourcentage du gain à la localité. Le
 rapporte surtout Generate (environ 81 Mo) : il ne remplace pas la comparaison
 B/op, ni ne prouve une empreinte totale identique aux autres variantes.
 
-**Portabilité : en attente.** Seul le banc M1 est présent pour `73d23bd`.
-Mesurer le même commit sur x86 avec `make bench-cpu`, puis comparer les ratios
-face à ghost sur les mêmes charges.
+**Résultat banc B, et le fait marquant du projet.** Même commit, même filtre.
+Sources : [Hyperfine](../results/73d23bd/x86-controle/hyperfine-stats.md),
+[benchstat](../results/73d23bd/x86-controle/benchstat.txt).
+
+| 1024², 64 foyers, 500 tours | Banc A — M1 | Banc B — x86 |
+|---|---:|---:|
+| `ghost` | 5,0587 s | 4,5180 s |
+| `bitpack` | **0,5913 s** | **0,7619 s** |
+| Gain de l'étape | ×8,56 | ×5,93 |
+| **Gain cumulé face à `naive`** | **×10,67** | **×10,66** |
+
+Les étapes prises une à une sont fortement dépendantes de l'architecture — `ghost` rend ×1,71 sur le
+banc B contre ×1,19 sur le banc A, `bitpack` fait l'inverse avec ×5,93 contre ×8,56. Mais **les gains
+cumulés convergent à deux millièmes près**. Là où le banc A avait moins à gagner sur le modulo, il
+avait davantage à gagner sur la compacité, et réciproquement. Ce n'est pas une compensation qu'on
+pouvait prévoir, et une seule machine ne l'aurait jamais montrée.
+
+##### Le goulot a changé de camp
+
+Le microbenchmark `Step` en embrasement 1024² passe de 12 474 µs (`naive`) à **172,0 µs**, soit ×72.
+Le binaire complet, lui, ne gagne que ×10,66. L'écart n'est pas une contradiction : c'est la
+**génération de carte**, qui ne dépend d'aucune de ces optimisations.
+
+Mesurée directement sur le banc B, une exécution à zéro tour coûte **686,2 ± 17,7 ms**
+([Hyperfine](../results/73d23bd/x86-controle/generation-hyperfine.md)) sur les 761,9 ms du binaire.
+
+| | Temps | Part du binaire |
+|---|---:|---:|
+| Génération de la carte | 686,2 ms | **90 %** |
+| Simulation (500 tours) | ~75,7 ms | 10 % |
+
+Rapportée à la seule simulation, la chaîne d'optimisations rend donc **×98** — de 7 436 ms à 76 ms.
+Le profil CPU le confirme, qui ne couvre que `fire.Run` : 80 ms d'échantillons, dont 87,5 % dans
+`Step`.
+
+**Conséquence pour la suite, et elle est contraignante.** La loi d'Amdahl plafonne désormais toute
+optimisation de `Step` à 10 % du temps de bout en bout : diviser la simulation par deux ferait gagner
+5 % au binaire. Les étapes `front` et `parallel` ont été conçues quand `Step` pesait 99 % du temps ;
+elles héritent d'un contexte qui n'existe plus. **Le poste à optimiser est maintenant `fire.Generate`,
+que rien n'a jamais touché.** Cette bascule est elle-même un résultat : elle illustre qu'une chaîne
+d'optimisations ne se planifie pas à l'avance, elle se re-priorise à chaque profil.
 
 **Décision :** conserver bitpack pour les gains observés dans les deux régimes,
 en documentant les régressions de construction, de Fingerprint et d'allocations

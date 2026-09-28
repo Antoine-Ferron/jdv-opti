@@ -1,0 +1,12 @@
+File: wildfire
+Build ID: 920982153f364972765ea53975076da9adf8d1ba
+Type: cpu
+Time: 2026-09-28 21:02:06 CEST
+Duration: 97.48ms, Total samples = 80ms (82.06%)
+Showing nodes accounting for 80ms, 100% of 80ms total
+      flat  flat%   sum%        cum   cum%
+      70ms 87.50% 87.50%       80ms   100%  gol-wildfire/internal/bitpack.(*Sim).Step
+      10ms 12.50%   100%       10ms 12.50%  gol-wildfire/internal/bitpack.(*Sim).spread
+         0     0%   100%       80ms   100%  gol-wildfire/internal/fire.Run
+         0     0%   100%       80ms   100%  main.main
+         0     0%   100%       80ms   100%  runtime.main

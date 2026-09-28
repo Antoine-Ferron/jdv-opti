@@ -1,0 +1,46 @@
+Total: 80ms
+ROUTINE ======================== gol-wildfire/internal/bitpack.(*Sim).Step in /mnt/d/COURS/SDV_2026_2027/Optimisations peformances backend/jdv/internal/bitpack/bitpack.go
+      70ms       80ms (flat, cum)   100% of Total
+         .          .    142:func (s *Sim) Step() {
+         .          .    143:	clear(s.ignite)
+         .          .    144:	for i := range s.source {
+         .          .    145:		s.source[i] = (s.f1[i] | s.f2[i]) &^ s.wind[i]
+         .          .    146:	}
+         .          .    147:	for y := 0; y < s.carte.Height; y++ {
+         .          .    148:		prev, next := y-1, y+1
+         .          .    149:		if prev < 0 {
+         .          .    150:			prev = s.carte.Height - 1
+         .          .    151:		}
+         .          .    152:		if next == s.carte.Height {
+         .          .    153:			next = 0
+         .          .    154:		}
+         .          .    155:		row := s.source[y*s.words : (y+1)*s.words]
+         .          .    156:		s.spread(row, s.ignite[prev*s.words:(prev+1)*s.words])
+         .          .    157:		s.spread(row, s.ignite[y*s.words:(y+1)*s.words])
+         .       10ms    158:		s.spread(row, s.ignite[next*s.words:(next+1)*s.words])
+         .          .    159:	}
+         .          .    160:	// Le centre est inclus par spread mais une case déjà en feu ignore l'ignition.
+      10ms       10ms    161:	for _, w := range s.winds {
+         .          .    162:		if (s.f1[w.source.word]|s.f2[w.source.word])&w.source.mask == 0 {
+         .          .    163:			continue
+         .          .    164:		}
+      10ms       10ms    165:		for _, t := range w.targets {
+         .          .    166:			s.ignite[t.word] |= t.mask
+         .          .    167:		}
+         .          .    168:	}
+         .          .    169:	count := 0
+         .          .    170:	for i := range s.f1 {
+         .          .    171:		f1, f2, r1, r2 := s.f1[i], s.f2[i], s.r1[i], s.r2[i]
+         .          .    172:		fresh := s.ignite[i] &^ (f1 | f2 | r1 | r2)
+         .          .    173:		// 2 -> 1 -> 0 pour le feu. Un feu à 1 expire ce tour-ci.
+         .          .    174:		s.f1[i] = f2 | (fresh & s.plain[i])
+         .          .    175:		s.f2[i] = fresh & s.forest[i]
+         .          .    176:		// Repos : 3 -> 2 -> 1 -> 0 ; extinction : plaine=2, forêt=3.
+         .          .    177:		s.r1[i] = (r2 &^ r1) | (f1 & s.forest[i])
+      10ms       10ms    178:		s.r2[i] = (r2 & r1) | f1
+      40ms       40ms    179:		count += bits.OnesCount64(s.f1[i] | s.f2[i])
+         .          .    180:	}
+         .          .    181:	s.burning = count
+         .          .    182:}
+         .          .    183:
+         .          .    184:// Fingerprint conserve le contrat et le formatage des variantes précédentes.
