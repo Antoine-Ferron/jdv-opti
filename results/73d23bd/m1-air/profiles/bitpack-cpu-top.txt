@@ -1,0 +1,20 @@
+File: wildfire
+Type: cpu
+Time: 2026-09-28 20:14:38 CEST
+Duration: 202.21ms, Total samples = 90ms (44.51%)
+Showing nodes accounting for 90ms, 100% of 90ms total
+      flat  flat%   sum%        cum   cum%
+      50ms 55.56% 55.56%       80ms 88.89%  gol-wildfire/internal/bitpack.(*Sim).Step
+      30ms 33.33% 88.89%       30ms 33.33%  gol-wildfire/internal/bitpack.(*Sim).spread
+      10ms 11.11%   100%       10ms 11.11%  runtime.pthread_cond_signal
+         0     0%   100%       80ms 88.89%  gol-wildfire/internal/fire.Run
+         0     0%   100%       80ms 88.89%  main.main
+         0     0%   100%       10ms 11.11%  runtime.gopreempt_m (inline)
+         0     0%   100%       10ms 11.11%  runtime.goschedImpl
+         0     0%   100%       80ms 88.89%  runtime.main
+         0     0%   100%       10ms 11.11%  runtime.morestack
+         0     0%   100%       10ms 11.11%  runtime.newstack
+         0     0%   100%       10ms 11.11%  runtime.notewakeup
+         0     0%   100%       10ms 11.11%  runtime.semawakeup
+         0     0%   100%       10ms 11.11%  runtime.startm
+         0     0%   100%       10ms 11.11%  runtime.wakep

@@ -1007,6 +1007,136 @@ l'ampleur du gain, il ne remet pas la conclusion en cause, mais le ×1,712 est �
 avec sa régression en front explicitement documentée au §4. Aucun remplacement
 universel de counters n'est justifié par ces résultats.
 
+### Étape 4 — `bitpack` : états et propagation par plans de bits
+
+**Commit : `73d23bd`. Optimisation mixte macro/micro.** Macro : quatre plans
+binaires remplacent les cellules et la propagation sans vent traite des blocs.
+Micro : décalages, masques, OU et comptage de bits. Avec W colonnes, H lignes et
+V cases ventées, Step est O(H × ceil(W/64) + V), donc reste O(N) à densité de
+vent fixe. Burning reste O(1).
+
+**Hypothèse préalable :** réduire les états à 4 bits/case contre 2 octets par
+cellule (hors arrondi des lignes et buffers auxiliaires), conserver zéro
+allocation par Step et viser au moins 20 % de temps en moins en saturé face à
+ghost. Voir [le protocole écrit avant le code](../internal/bitpack/README.md).
+
+**Modification :** propagation sans vent par mots de 64 bits, transitions de
+feu et repos par opérations booléennes ; les cases ventées sont traitées
+séparément, avec leurs six cibles précalculées. Le bouclage torique utilise
+les retenues entre mots et le masquage du dernier mot, remplaçant le halo de
+ghost. Fingerprint conserve son format, mais extrait maintenant les états des
+plans de bits. Les anciennes implémentations et firetest restent inchangées.
+
+**Correction :** conformité, comparaisons avec ghost, huit directions de vent,
+grilles minuscules et largeurs 63/64/65/127/128/129 passent. Les bits hors grille
+sont vérifiés. `make test`, `make escape IMPL=bitpack` et
+`make quick IMPL=bitpack` passent ; aucune allocation dans Step, allocations de
+construction et de Fingerprint conservées et identifiées.
+
+**Sources banc A :** [environnement](../results/73d23bd/m1-air/env.md),
+[tests](../results/73d23bd/m1-air/tests.txt),
+[benchstat](../results/73d23bd/m1-air/benchstat.txt) et
+[mesures brutes](../results/73d23bd/m1-air/bench.txt).
+Les comparaisons suivantes utilisent ghost et bitpack de cette même campagne.
+
+**Commandes après commit du code :**
+
+```bash
+make bench-cpu BANC=m1-air
+benchstat -col /impl results/73d23bd/m1-air/bench.txt
+make profile IMPL=bitpack BANC=m1-air
+hyperfine -N --warmup 3 --runs 12 \
+  --export-json results/73d23bd/m1-air/front50-hyperfine.json \
+  --export-markdown results/73d23bd/m1-air/front50-hyperfine.md \
+  -n "ghost front" "./bin/wildfire -impl ghost -size 1024 -turns 50 -fires 1 -quiet" \
+  -n "bitpack front" "./bin/wildfire -impl bitpack -size 1024 -turns 50 -fires 1 -quiet"
+```
+
+**Microbenchmarks :** 10 échantillons par variante. Tous les écarts du tableau
+sont significatifs, p < 0,001. Les ratios ci-dessous sont ghost/bitpack,
+calculés avec les valeurs arrondies ; benchstat place bitpack en référence et
+ses pourcentages « vs base » ne sont donc pas des réductions du temps de bitpack.
+
+| Mesure | ghost | bitpack | Ratio ghost/bitpack |
+|---|---:|---:|---:|
+| Step saturé 256² | 641,78 µs | 12,41 µs | ×51,71 |
+| Step saturé 1024² | 8 815,0 µs | 192,8 µs | ×45,72 |
+| Step saturé 2048² | 21 676,6 µs | 774,7 µs | ×27,98 |
+| Run front 512² | 33,942 ms | 3,108 ms | ×10,92 |
+| Run front 1024² | 133,43 ms | 11,98 ms | ×11,14 |
+| Run embrasement 512² | 52,777 ms | 3,206 ms | ×16,46 |
+| Run embrasement 1024² | 167,53 ms | 12,18 ms | ×13,75 |
+| New 1024² | 1,0554 ms | 4,1577 ms | ×0,254 (régression) |
+| Fingerprint 1024² | 24,60 ms | 26,31 ms | ×0,935 (régression) |
+
+L'objectif de Step est dépassé. En revanche, New devient environ 3,94 fois
+plus lent et Fingerprint régresse d'environ 7,0 %. Run inclut la construction
+et 50 tours au maximum, mais pas Generate ; le gain de Step seul ne constitue
+pas un gain du programme complet.
+
+**Mémoire :** Step reste à **0 B/op et 0 allocs/op** aux trois tailles.
+En 1024², New et Run passent de 22 à 29 allocations et de 5,498 à 5,437 Mio
+alloués/op (environ −1,1 %). En 2048², New passe de 21,177 à 24,640 Mio
+(environ +16,4 %), et de 25 à 35 allocations. Les quatre plans d'état sont
+bien compacts, mais les masques auxiliaires, les cibles du vent et les
+réallocations de leur table empêchent d'annoncer une division par quatre de
+la mémoire totale. B/op mesure les allocations cumulées, pas le pic résident.
+
+**Programme complet, génération comprise.** Sources :
+[Hyperfine 500 tours](../results/73d23bd/m1-air/hyperfine-stats.md),
+[Hyperfine front](../results/73d23bd/m1-air/front50-hyperfine.md).
+
+| Charge 1024² | Répétitions | ghost, moyenne ± écart-type | bitpack, moyenne ± écart-type | Réduction observée | Accélération |
+|---|---:|---:|---:|---:|---:|
+| 64 foyers, 500 tours | 15 | 5,0587 ± 0,0180 s | 0,5913 ± 0,0096 s | 88,3 % | ×8,55 |
+| 1 foyer, 50 tours | 12 | 605,9 ± 14,3 ms | 495,2 ± 6,8 ms | 18,3 % | ×1,22 |
+
+En saturé, CV de 0,4 % pour ghost et 1,6 % pour bitpack ; Hyperfine signale
+des valeurs atypiques pour bitpack. En front, CV d'environ 2,4 % et 1,4 %.
+Ces résumés ne fournissent pas de p-value ; celles des microbenchmarks ne leur
+sont pas transférées. Face à naive (6,3078 s), l'accélération globale cumulée
+observée en saturé est ×10,67. La préparation de carte reste dans Hyperfine,
+ce qui explique en partie l'écart avec les gains sur Step et Run ; sa part
+exacte n'est pas quantifiée ici.
+
+**Profil CPU prolongé.** Le profil standard à 500 tours ne contient que 90 ms
+d'échantillons, insuffisants pour des pourcentages précis. Un profil distinct
+à 10 000 tours est conservé, sans changer la charge des benchmarks :
+
+```bash
+./bin/wildfire -impl bitpack -size 1024 -turns 10000 -fires 64 -quiet \
+  -cpuprofile results/73d23bd/m1-air/profiles/bitpack-10000t-cpu.prof
+go tool pprof -top -nodecount=15 bin/wildfire \
+  results/73d23bd/m1-air/profiles/bitpack-10000t-cpu.prof
+go tool pprof -http=localhost:8080 bin/wildfire \
+  results/73d23bd/m1-air/profiles/bitpack-10000t-cpu.prof
+```
+
+Le [profil prolongé](../results/73d23bd/m1-air/profiles/bitpack-10000t-cpu-top.txt)
+contient 1,69 s échantillonnée : Step représente 70,41 % directement et 97,04 %
+avec ses appels ; spread représente 24,26 %, déjà inclus dans ce cumul.
+Ces parts décrivent la charge prolongée, pas exactement les 500 premiers tours.
+
+![Profil CPU bitpack sur M1, 10 000 tours](figures/m1-air/flame-cpu-bitpack-10000t.png)
+
+**Explication physique :** le calcul sans vent et les transitions traitent
+jusqu'à 64 cases par mot, au lieu de répéter la logique pour chaque cellule.
+Le volume des plans d'état diminue et le travail de propagation scalaire est
+réservé au vent. Aucune mesure directe des défauts de cache ne permet d'attribuer
+un pourcentage du gain à la localité. Le
+[profil mémoire](../results/73d23bd/m1-air/profiles/bitpack-mem-top.txt)
+rapporte surtout Generate (environ 81 Mo) : il ne remplace pas la comparaison
+B/op, ni ne prouve une empreinte totale identique aux autres variantes.
+
+**Portabilité : en attente.** Seul le banc M1 est présent pour `73d23bd`.
+Mesurer le même commit sur x86 avec `make bench-cpu`, puis comparer les ratios
+face à ghost sur les mêmes charges.
+
+**Décision :** conserver bitpack pour les gains observés dans les deux régimes,
+en documentant les régressions de construction, de Fingerprint et d'allocations
+à grande taille au §4. Ne pas présenter la compacité des seuls états comme une
+réduction équivalente de toutes les allocations.
+
 ### 3.1 Mémoire & localité de cache
 
 - Grille plate `[]uint8` + double tampon, et tampon d'ignition réutilisé : zéro allocation par tour.
@@ -1576,6 +1706,21 @@ la variante pour ce régime. En front, Hyperfine est non concluant et ne réfute
 pas la régression de Run. Le critère de choix est donc la charge, pas seulement
 le nom de la version. Aucun revert n'est effectué ici ; si la variante est
 abandonnée, elle sera annulée par revert sans effacer cette campagne.
+
+### Compromis mesuré — `bitpack` : compacité des états et coût de préparation
+
+La [campagne 73d23bd](../results/73d23bd/m1-air/benchstat.txt) montre que la
+compacité des états n'implique pas une réduction uniforme des allocations.
+New/2048² alloue 24,640 Mio contre 21,177 Mio pour ghost (+16,4 % environ).
+La table des cibles ventées et sa croissance contribuent à ce coût. En 1024²,
+New est environ 3,94 fois plus lent ; Fingerprint régresse d'environ 7,0 %
+(p < 0,001 dans les deux cas). La lecture des plans de bits ajoute des
+extractions au formatage conservé, une explication plausible de cette dernière
+régression, sans attribution causale isolée.
+
+Les gains du programme complet (×8,55 en saturé, ×1,22 en front face à ghost)
+justifient de conserver l'étape comme compromis mesuré. Aucun revert ici ;
+une variante abandonnée devra être annulée sans effacer les résultats historiques.
 
 ### Autres pistes à explorer
 
