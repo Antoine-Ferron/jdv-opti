@@ -30,7 +30,7 @@ import (
 	//                   //           torique calculé par modulo rendrait pénible ; et l'écart entre
 	//                   //           les deux bancs est la meilleure démonstration de
 	//                   //           non-portabilité du rapport. Ne pas en attendre un gain majeur.
-	// _ ".../bitpack"   // étape 4 : plans de bits, propagation par OU — attaque Step, seul poste
+	_ "gol-wildfire/internal/bitpack" // étape 4 : plans de bits, propagation par OU — attaque Step, seul poste
 	//                   //           qui dépasse 21 % sur le banc A. C'est là qu'est le gros du gain.
 	// _ ".../front"     // étape 5 : liste des cases actives — attaque Step ET Burning quand peu de
 	//                   //           cases brûlent, et ne rapporte rien en régime saturé. Candidat
