@@ -75,8 +75,34 @@ dérive machine.
 | **V2** `counters` | Compteur de cases en feu incrémental | 5,9540 s | 0,2 % | 7,7421 s | 1,0 % | 0 | ×1,059 | ×1,049 |
 | **V3** `ghost` | Bordure fantôme, plus aucun modulo | 5,0587 s | 0,4 % | 4,5180 s | 1,3 % | 0 | ×1,247 | ×1,798 |
 | **V4** `bitpack` ★ | États et propagation par plans de bits | **0,5913 s** | 1,6 % | **0,7619 s** | 1,3 % | 0 | **×10,67** | **×10,66** |
+| **V5** `front` ⚠ | Liste des cases actives, balayage restreint | *(à relancer)* | — | 8,2312 s | 0,4 % | 0 | — | **×1,002** |
 
 ⚠ régression • ★ version retenue
+
+V5 est mesurée à la campagne `981c735`, postérieure. Sa colonne banc A est en attente : la campagne
+de ce banc affichait des CV de 10 à 21 %, très au-dessus du seuil, et doit être rejouée au calme.
+La direction n'est pas en cause — sur les deux bancs, `front` ramène le binaire au niveau de la
+baseline en régime saturé — mais aucun chiffre précis n'en est citable.
+
+**V5 est le cas le plus instructif du projet parce qu'elle se contredit selon l'échelle
+d'observation** (banc B, campagne `981c735`) :
+
+| Mesure | `bitpack` | `front` | Verdict |
+|---|---:|---:|---|
+| `Run`, scénario creux, 1024² | 11,89 ms | **3,78 ms** | **×3,1 en faveur de V5** |
+| `Step`, embrasement, 1024² | 175 µs | 11 159 µs | ×64 contre |
+| Binaire, embrasement 500 tours | 0,7661 s | 8,2312 s | ×10,7 contre |
+| Binaire, régime creux 50 tours | 686,8 ms | 686,5 ms | indistinguable |
+
+L'étape **fait exactement ce pour quoi elle a été écrite** — diviser par trois le coût de la
+simulation quand la grille est creuse — et reste **invisible de bout en bout**, parce que la
+génération de carte seule coûte 682,3 ms sur les 686,5 du binaire dans ce régime, soit **99,4 %**.
+Elle annule par ailleurs toute la chaîne en régime saturé : maintenir une liste de cases actives
+quand tout brûle revient à payer la gestion de la liste en plus du travail, et à perdre la
+propagation par mots de 64 bits qui fait l'intérêt de V4.
+
+**Aucune version n'est donc la meilleure dans les deux régimes** — ce que le §1.2 anticipait en en
+définissant deux. Mesuré sur le seul embrasement, `front` aurait été jeté à tort.
 
 **Débit.** De 8,31 × 10⁷ à 8,87 × 10⁸ cases/s sur le banc A ; de 6,46 × 10⁷ à 6,88 × 10⁸ sur le banc B.
 
@@ -90,7 +116,7 @@ le modulo, elle avait davantage à gagner sur la compacité. Aucune machine seul
 
 Sources : [banc A](../results/73d23bd/m1-air/hyperfine-stats.md) •
 [banc B](../results/73d23bd/x86-controle/hyperfine-stats.md) •
-[benchstat](../results/73d23bd/x86-controle/benchstat.txt)
+[benchstat](../results/73d23bd/x86-controle/benchstat.txt) • [V5 banc B](../results/981c735/x86-controle/hyperfine-stats.md) • [V5 régime creux](../results/981c735/x86-controle/front50-hyperfine.md)
 
 ## 1.4 Représentation graphique
 
@@ -228,6 +254,7 @@ au changement d'architecture.
 | **Déduplication** de snapshots | Éviter de réécrire un état déjà vu doit rapporter plus que le pool | −55,9 % sur `proto` | **+73,6 % sur `packed`** | **Écartée par défaut** |
 | **`sync.Pool`** — portabilité | Le gain tient au volume alloué, donc il vaut partout | −6 à −22 % banc B | non significatif banc A | **Conservée**, gain non portable |
 | **`counters`** en 256² | Le compteur incrémental ne coûte rien | −5,9 % en 1024² | +1,8 % sur `Step` en 256², banc A | **Conservée**, compromis local documenté |
+| **V5** `front` — liste des cases actives | Ne balayer que les cases actives doit gagner en régime creux | **×3,1** sur la simulation creuse | **×64 sur `Step` saturé**, binaire ramené à la baseline | **Non retenue par défaut**, conservée comme variante de régime |
 
 **Échec n°1 — L'optimisation qui supprime des allocations sans gagner de temps.** `flat` atteint zéro
 allocation par `Step` et **régresse** de 0,2 %. Le second tampon ajoute 2N octets de stockage
@@ -248,6 +275,7 @@ périmètre est celui du changement :
 |---|---|---|---|
 | `BenchmarkRun` sur `flat` | ×3,4 | ×1,12 | Le banc reconstruisait le moteur à chaque itération (1 076 allocations) |
 | Hyperfine `front 50` sur `counters` | +3,2 % | +21,8 % | 88 % de la mesure était de la génération de carte |
+| Hyperfine `front 50` sur V5 | aucun gain | ×3,1 sur la simulation | 99,4 % de la mesure était de la génération de carte |
 | Banc d'empreinte | 0,150 ms | 1,785 ms | Résultat jamais lu : le compilateur supprimait le calcul |
 
 Le troisième s'est trahi par une grandeur physique impossible — 0,15 ns par case, soit moins d'un
@@ -268,9 +296,10 @@ directement à zéro tour sur le banc B :
 Rapportée à la seule simulation, la chaîne rend donc **×98** — de 7 436 ms à 76 ms.
 
 **Conséquence, et elle est contraignante.** La loi d'Amdahl plafonne désormais toute optimisation de
-`Step` à 10 % du temps de bout en bout : diviser la simulation par deux ferait gagner 5 % au binaire.
-Les étapes restantes du plan initial — liste des cases actives, parallélisation de `Step` — ont été
-conçues quand `Step` pesait 95 % du temps ; elles héritent d'un contexte qui n'existe plus.
+`Step` à 10 % du temps de bout en bout — et à 0,6 % en régime creux, où la génération occupe 99,4 %
+du binaire. L'étape V5 en fait la démonstration involontaire : elle divise par trois le coût de la
+simulation creuse sans que le binaire ne bouge d'une milliseconde. La parallélisation de `Step`,
+dernière étape du plan initial, bute sur le même plafond avant même d'être écrite.
 
 **L'étape logique suivante est `fire.Generate`**, que rien n'a jamais touché, et elle porte deux
 leviers indépendants : paralléliser `champLisse` par plages de lignes, et remplacer les quatre tris
