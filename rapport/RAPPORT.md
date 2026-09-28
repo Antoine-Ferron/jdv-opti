@@ -326,6 +326,66 @@ soixante-douze fois plus lourd.
 
 ---
 
+# Conclusion
+
+**Résultat.** Le binaire complet passe de 6,63 s à 0,59 s sur le banc A et de 8,25 s à 0,77 s sur le
+banc B, soit **×11,2 et ×10,8** sur deux architectures que tout oppose. Rapportée à la seule
+simulation, hors génération de carte, la chaîne rend **×72 et ×97**. Le débit passe de 7,9 × 10⁷ à
+8,9 × 10⁸ cases par seconde.
+
+**Ce que la mesure a dit contre nous.** Cinq hypothèses ont été écrites avant leur code ; **trois ont
+été réfutées** :
+
+| Hypothèse | Verdict |
+|---|---|
+| Supprimer les allocations par tour réduira le temps | Réfutée — zéro allocation, ×0,998 |
+| Un index SQL rend un ordre de grandeur dès quelques dizaines de milliers de lignes | Réfutée — seuil sous-estimé d'un facteur 25 |
+| `sync.Pool` gagne du temps partout, puisqu'il supprime des allocations partout | Réfutée — −22 % sur un banc, rien sur l'autre |
+| Grouper les insertions en un `COPY` rend un ordre de grandeur | Confirmée — ×12,7 à ×19,0 |
+| Le bit-packing rend le gain principal | Confirmée — ×5,9 à ×8,6 à elle seule |
+
+S'y ajoutent **quatre pièges de périmètre**, où la mesure annonçait un chiffre faux sans rien
+signaler : un benchmark qui reconstruisait l'objet mesuré, deux mesures noyées par la génération de
+carte, et un calcul supprimé par le compilateur faute d'être lu. Aucun n'a été détecté par la
+mesure elle-même — tous l'ont été en confrontant deux voies indépendantes, ou en ramenant un temps à
+une grandeur physique. **C'est le seul garde-fou qui ait fonctionné.**
+
+**État des trois axes.**
+
+| Axe | État | Gain |
+|---|---|---|
+| Mémoire & localité de cache | Traité, quatre étapes | Porte l'essentiel du ×11 |
+| I/O réseau & persistance | Traité, cinq étapes | ×77 sur la taille, ×12,7 sur les écritures, ×46,8 sur la requête |
+| Concurrence & scalabilité CPU | **Non traité** | Plafonné par Amdahl à 10 % du binaire |
+
+Le troisième axe n'est pas resté vide par manque de temps mais par décision mesurée : depuis V4, la
+simulation ne pèse plus que 11 à 14 % du binaire, et 0,6 % en régime creux. Paralléliser `Step`
+aurait exposé les trois mécanismes attendus — worker pool aux cœurs physiques, compteur atomique,
+arrêt précoce — pour un gain de bout en bout borné à 5 %. V5 en a fourni la démonstration
+involontaire en divisant par trois la simulation creuse sans que le binaire ne bouge.
+
+**Étape logique suivante, chiffrée.** `fire.Generate` occupe désormais 86 à 89 % du temps et n'a
+jamais été touché. Deux leviers indépendants y attendent : paralléliser `champLisse` par plages de
+lignes — c'est là que le worker pool trouverait enfin une charge qui le justifie — et remplacer les
+quatre tris complets de `quantile` par un quickselect, O(n) au lieu de O(n log n). Ramener 686 ms à
+150 ms porterait le binaire de ×10,8 à environ ×25.
+
+**Ce que le projet établit au-delà de ses chiffres.**
+
+1. **Un défaut de code n'a pas le même poids selon le silicium.** Le modulo torique pèse 37 % du
+   profil sur x86 et 9 % sur ARM ; l'étape qui le supprime rend ×1,80 d'un côté, ×1,30 de l'autre.
+   Une seule machine aurait donné une conclusion fausse sur la valeur de cette optimisation.
+2. **Les gains individuels ne sont pas portables, leur cumul l'est.** Chaque banc gagne là où l'autre
+   avait moins à prendre, et les deux arrivent autour de ×11.
+3. **Aucune version n'est la meilleure dans les deux régimes.** V5 gagne ×3,1 sur grille creuse et
+   perd ×64 sur grille saturée. Le choix d'une implémentation dépend de la charge, pas de sa qualité
+   intrinsèque.
+4. **Une optimisation se juge contre l'état du code au moment où on l'évalue**, jamais dans l'absolu.
+   La déduplication de snapshots aurait été un succès avant le format bit-packé ; mesurée après, elle
+   coûte plus qu'elle ne rapporte.
+
+---
+
 # Annexe — Gouvernance technique IA (`constitution.md`)
 
 Fichier placé à la racine du dépôt, contraignant tout assistant de génération de code sur ce projet,
