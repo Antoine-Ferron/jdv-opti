@@ -1,5 +1,5 @@
-# Banc d'essai — 2026-09-28T21:20:23+02:00
-Commit : 981c735
+# Banc d'essai — 2026-09-28T22:48:58+02:00
+Commit : 64864b4 (ATTENTION : modifications non commitées)
 Code mesuré : 981c735 (dernier commit touchant le code ou le protocole)
 
 ## CPU
