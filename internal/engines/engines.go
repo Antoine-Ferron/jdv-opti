@@ -32,7 +32,7 @@ import (
 	//                   //           non-portabilité du rapport. Ne pas en attendre un gain majeur.
 	_ "gol-wildfire/internal/bitpack" // étape 4 : plans de bits, propagation par OU — attaque Step, seul poste
 	//                   //           qui dépasse 21 % sur le banc A. C'est là qu'est le gros du gain.
-	// _ ".../front"     // étape 5 : liste des cases actives — attaque Step ET Burning quand peu de
+	_ "gol-wildfire/internal/front" // étape 5 : liste des cases actives — attaque Step ET Burning quand peu de
 	//                   //           cases brûlent, et ne rapporte rien en régime saturé. Candidat
 	//                   //           du §4 : le gain dépend du régime, pas de l'implémentation.
 	// _ ".../parallel"  // étape 6 : worker pool dimensionné aux cœurs performance (4 sur M1), pas
