@@ -64,25 +64,27 @@ Deux régimes, qui ne désignent pas les mêmes goulots :
 
 ## 1.3 Tableau comparatif des mesures brutes
 
-Binaire complet, 1024², 64 foyers, 500 tours, 15 répétitions, campagne `73d23bd` — **les cinq
-versions mesurées dans une même session**, seule façon d'obtenir des ratios non contaminés par la
-dérive machine.
+Binaire complet, 1024², 64 foyers, 500 tours, 15 répétitions, campagne `981c735` — **les six
+versions mesurées dans une même session sur chaque banc**, seule façon d'obtenir des ratios non
+contaminés par la dérive machine.
 
 | Version | Stratégie | Banc A | CV | Banc B | CV | allocs/`Step` | **Cumul A** | **Cumul B** |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| **V0** `naive` | Baseline `[][]Cell`, 2 o/case, tampon par tour | 6,3078 s | 2,2 % | 8,1219 s | 0,5 % | 1 | ×1 | ×1 |
-| **V1** `flat` ⚠ | Grille contiguë, double tampon réutilisé | 6,3107 s | 0,4 % | 8,1420 s | 0,9 % | 0 | **×0,999** | **×0,998** |
-| **V2** `counters` | Compteur de cases en feu incrémental | 5,9540 s | 0,2 % | 7,7421 s | 1,0 % | 0 | ×1,059 | ×1,049 |
-| **V3** `ghost` | Bordure fantôme, plus aucun modulo | 5,0587 s | 0,4 % | 4,5180 s | 1,3 % | 0 | ×1,247 | ×1,798 |
-| **V4** `bitpack` ★ | États et propagation par plans de bits | **0,5913 s** | 1,6 % | **0,7619 s** | 1,3 % | 0 | **×10,67** | **×10,66** |
-| **V5** `front` ⚠ | Liste des cases actives, balayage restreint | *(à relancer)* | — | 8,2312 s | 0,4 % | 0 | — | **×1,002** |
+| **V0** `naive` | Baseline `[][]Cell`, 2 o/case, tampon par tour | 6,6328 s | **5,4 %** | 8,2452 s | 0,7 % | 1 | ×1 | ×1 |
+| **V1** `flat` ⚠ | Grille contiguë, double tampon réutilisé | 6,3781 s | 0,8 % | 8,2330 s | 0,6 % | 0 | ×1,040 | **×1,001** |
+| **V2** `counters` | Compteur de cases en feu incrémental | 6,0149 s | 1,7 % | 7,8536 s | 0,8 % | 0 | ×1,103 | ×1,050 |
+| **V3** `ghost` | Bordure fantôme, plus aucun modulo | 5,0866 s | 0,4 % | 4,5822 s | 1,2 % | 0 | ×1,304 | ×1,799 |
+| **V4** `bitpack` ★ | États et propagation par plans de bits | **0,5916 s** | 1,3 % | **0,7661 s** | 1,0 % | 0 | **×11,21** | **×10,76** |
+| **V5** `front` ⚠ | Liste des cases actives, balayage restreint | 9,0816 s | 1,8 % | 8,2312 s | 0,4 % | 0 | ×0,730 | ×1,002 |
 
 ⚠ régression • ★ version retenue
 
-V5 est mesurée à la campagne `981c735`, postérieure. Sa colonne banc A est en attente : la campagne
-de ce banc affichait des CV de 10 à 21 %, très au-dessus du seuil, et doit être rejouée au calme.
-La direction n'est pas en cause — sur les deux bancs, `front` ramène le binaire au niveau de la
-baseline en régime saturé — mais aucun chiffre précis n'en est citable.
+**Réserve sur la baseline du banc A.** `naive` y affiche 5,4 % de CV, très au-dessus du seuil de 2 %,
+avec une amplitude de 6,25 à 7,48 s — le refroidissement passif du MacBook Air, déjà signalé au §1.1.
+Comme cette valeur est le dénominateur de toute la colonne « Cumul A », **les gains inférieurs à 10 %
+n'y sont pas lisibles** : le ×1,040 de V1 tient dans l'incertitude. Les ordres de grandeur, eux, ne
+sont pas menacés. Deux relances successives n'ont pas stabilisé cette ligne, ce qui en fait une
+limite du banc plutôt qu'un incident.
 
 **V5 est le cas le plus instructif du projet parce qu'elle se contredit selon l'échelle
 d'observation** (banc B, campagne `981c735`) :
@@ -104,19 +106,26 @@ propagation par mots de 64 bits qui fait l'intérêt de V4.
 **Aucune version n'est donc la meilleure dans les deux régimes** — ce que le §1.2 anticipait en en
 définissant deux. Mesuré sur le seul embrasement, `front` aurait été jeté à tort.
 
-**Débit.** De 8,31 × 10⁷ à 8,87 × 10⁸ cases/s sur le banc A ; de 6,46 × 10⁷ à 6,88 × 10⁸ sur le banc B.
+**Débit.** De 7,90 × 10⁷ à 8,86 × 10⁸ cases/s sur le banc A ; de 6,36 × 10⁷ à 6,84 × 10⁸ sur le banc B.
 
-**Microbenchmark `Step`**, embrasement 1024², banc B : 12 474 µs (V0) → **172,0 µs** (V4), soit
-**×72,5**. L'écart avec le ×10,66 du binaire est analysé au §2.4.
+**Microbenchmark `Step`**, embrasement 1024², banc B : 12 547 µs (V0) → **175 µs** (V4), soit
+**×71,7**. L'écart avec le ×10,76 du binaire est analysé au §2.4.
 
 **Le fait le plus instructif du tableau** : les étapes prises une à une dépendent fortement de
-l'architecture — `ghost` rend ×1,80 sur le banc B contre ×1,25 sur le banc A, `bitpack` fait
-l'inverse — mais **les cumuls convergent à deux millièmes**. Là où une machine avait peu à gagner sur
-le modulo, elle avait davantage à gagner sur la compacité. Aucune machine seule ne l'aurait montré.
+l'architecture — `ghost` rend ×1,80 sur le banc B contre ×1,30 sur le banc A, `bitpack` fait
+l'inverse — mais **les cumuls se rejoignent autour de ×11 sur les deux bancs**. Là où une machine
+avait peu à gagner sur le modulo, elle avait davantage à gagner sur la compacité. Aucune machine
+seule ne l'aurait montré.
 
-Sources : [banc A](../results/73d23bd/m1-air/hyperfine-stats.md) •
-[banc B](../results/73d23bd/x86-controle/hyperfine-stats.md) •
-[benchstat](../results/73d23bd/x86-controle/benchstat.txt) • [V5 banc B](../results/981c735/x86-controle/hyperfine-stats.md) • [V5 régime creux](../results/981c735/x86-controle/front50-hyperfine.md)
+L'écart résiduel entre ×11,21 et ×10,76 n'est pas interprétable : il est du même ordre que
+l'incertitude de la baseline du banc A. Une campagne antérieure à cinq versions donnait ×10,67 et
+×10,66, soit une coïncidence au millième — rapprochement qu'il aurait été tentant de présenter comme
+un résultat, et que la campagne suivante n'a pas reproduit. **C'est la convergence qui est le
+résultat, pas sa précision.**
+
+Sources : [banc A](../results/981c735/m1-air/hyperfine-stats.md) •
+[banc B](../results/981c735/x86-controle/hyperfine-stats.md) •
+[benchstat banc B](../results/981c735/x86-controle/benchstat.txt) • [régime creux](../results/981c735/x86-controle/front50-hyperfine.md)
 
 ## 1.4 Représentation graphique
 
@@ -286,14 +295,17 @@ rien**, et la seule défense est de ramener chaque temps à une grandeur physiqu
 
 Le microbenchmark `Step` gagne ×72,5 quand le binaire n'en gagne que ×10,66. L'écart n'est pas une
 contradiction : c'est la **génération de carte**, que ces optimisations ne touchent pas. Mesurée
-directement à zéro tour sur le banc B :
+directement à zéro tour sur les deux bancs :
 
-| | Temps | Part du binaire |
-|---|---:|---:|
-| Génération de la carte (bruit lissé + quantiles) | 686,2 ms | **90 %** |
-| Simulation, 500 tours | ~75,7 ms | 10 % |
+| | Banc A | Part | Banc B | Part |
+|---|---:|---:|---:|---:|
+| Génération de la carte (bruit lissé + quantiles) | 508,2 ms | **86 %** | 682,3 ms | **89 %** |
+| Simulation, 500 tours | 83,4 ms | 14 % | 83,8 ms | 11 % |
 
-Rapportée à la seule simulation, la chaîne rend donc **×98** — de 7 436 ms à 76 ms.
+Rapportée à la seule simulation, la chaîne rend **×72** sur le banc A et **×97** sur le banc B.
+Détail à relever : après optimisation, **les deux machines mettent le même temps à simuler** — 83,4
+contre 83,8 ms — alors que le banc A était 20 % plus rapide sur la baseline. La chaîne a rapproché
+deux architectures que le code naïf séparait.
 
 **Conséquence, et elle est contraignante.** La loi d'Amdahl plafonne désormais toute optimisation de
 `Step` à 10 % du temps de bout en bout — et à 0,6 % en régime creux, où la génération occupe 99,4 %
