@@ -2,7 +2,11 @@
 
 **Sup de Vinci • RNCP Bloc 4 - Optimisations & Performances Backend • Session E42**
 
-*Binôme • Mesures au 28 septembre 2026 • Révision du 29 septembre 2026*
+**Auteurs :** FERRON Antoine et DIALLO Mamadou Cherif
+
+**Classe :** M2DevA
+
+*Mesures au 28 septembre 2026 • Révision du 29 septembre 2026*
 
 > **Description fonctionnelle.** Wildfire simule un incendie sur une grille torique : sur un décor
 > de terrain et de vent fixes, combustion et repos évoluent selon des règles synchrones de voisinage.
