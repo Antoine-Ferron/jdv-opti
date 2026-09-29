@@ -6,6 +6,8 @@
 
 **Classe :** M2DevA
 
+**Dépôt GitHub du projet :** https://github.com/Antoine-Ferron/jdv-opti
+
 *Mesures au 28 septembre 2026 • Révision du 29 septembre 2026*
 
 > **Description fonctionnelle.** Wildfire simule un incendie sur une grille torique : sur un décor
@@ -51,10 +53,10 @@ campagne `981c735`, 15 répétitions par ligne. Écart-type et variance calculé
 | B / `naive` | 8,2452 | 8,2317 | 0,0564 | 3,186e-3 | 0,7 % |
 | B / `bitpack` | 0,7661 | 0,7675 | 0,0080 | 6,329e-5 | 1,0 % |
 
-Sources : [environnement A](../results/981c735/m1-air/env.md) /
-[B](../results/981c735/x86-controle/env.md) ; [benchmarks](../internal/bench/bench_test.go) ;
-statistiques des six moteurs [A](../results/981c735/m1-air/hyperfine-stats.md) /
-[B](../results/981c735/x86-controle/hyperfine-stats.md).
+Sources :
+[environnement A](../results/981c735/m1-air/env.md) / [B](../results/981c735/x86-controle/env.md) ;
+[benchmarks](../internal/bench/bench_test.go) ;
+statistiques des six moteurs [A](../results/981c735/m1-air/hyperfine-stats.md) / [B](../results/981c735/x86-controle/hyperfine-stats.md).
 
 ## 1.2 Charge et dimensionnement
 
