@@ -1,414 +1,325 @@
-# Rapport d'audit technique — Wildfire
+# Rapport d'audit technique - Wildfire
 
-**Sup de Vinci • RNCP Bloc 4 — Optimisations & Performances Backend • Session E42**
+**Sup de Vinci • RNCP Bloc 4 - Optimisations & Performances Backend • Session E42**
 
-*Simulation d'incendie de forêt haute performance en Go*
+*Binôme • Mesures au 28 septembre 2026 • Révision du 29 septembre 2026*
 
-> **Description fonctionnelle du système**
->
-> Wildfire est un automate cellulaire multi-états simulant la propagation d'un incendie sur un tore.
-> Chaque case porte un terrain (eau, plaine, forêt), un vent éventuel, et deux compteurs — tours de
-> combustion restants, tours de repos. La grille est mise à jour de façon synchrone en voisinage de
-> Moore ; le vent porte le feu à deux cases dans sa direction, y compris par-dessus l'eau, et épargne
-> le secteur amont. Les règles complètes tiennent dans `internal/fire/REGLES.md`.
->
-> Ce document consigne l'audit micro-architectural du système en deux volets : le reporting factuel
-> des mesures et du protocole statistique, puis l'analyse des choix d'ingénierie matérielle, des
-> échecs constructifs et de la gouvernance technique.
+> **Description fonctionnelle.** Wildfire simule un incendie sur une grille torique : sur un décor
+> de terrain et de vent fixes, combustion et repos évoluent selon des règles synchrones de voisinage.
+> L'audit compare six moteurs Go et un volet indépendant de sérialisation et de persistance.
+> [Règles du système](../internal/fire/REGLES.md).
 
-**Binôme • 28 septembre 2026 • Dépôt :** `github.com/Antoine-Ferron/jdv-opti`
+# Partie I - Reporting, métrologie & résultats
 
----
+## 1.1 Bancs d'essai et protocole
 
-# Partie I — Reporting, métrologie & résultats
-
-## 1.1 Bancs d'essai matériel & rigueur métrologique
-
-Deux machines, mesurées à chaque étape. Le **banc A fait foi** ; le **banc B** sert de témoin de
-portabilité — ce sont les gains qui ne survivent pas au changement d'architecture qui en disent le
-plus sur le matériel.
-
-| Composant | Banc A — référence | Banc B — témoin |
+| Composant | Banc A - référence | Banc B - témoin |
 |---|---|---|
-| **Processeur** | Apple M1, 8 cœurs (4 performance + 4 efficience) | Intel Core Ultra 9 275HX, 24 cœurs / 24 threads |
-| **Caches** | L1d 64 Ko • L1i 128 Ko • L2 4 Mo • ligne 128 o | L1d 48 Ko • L1i 64 Ko • L2 3 Mo • L3 36 Mo • ligne 64 o |
-| **Mémoire** | 8 Gio unifiée | 31 Gio exposés à WSL2 (64 Gio hôte) |
-| **Système** | macOS 27.0 (26A428) | Ubuntu 26.04 LTS sur WSL2, noyau 6.6.114.1 |
-| **Runtime** | Go 1.27.1 `darwin/arm64` | Go 1.27.1 `linux/amd64`, GOAMD64 v1 |
-| **Protocole** | benchstat `n=10` • Hyperfine `-N --warmup 3 --runs 15` | idem |
+| CPU / RAM exposée | Apple M1, 8 cœurs / 8 Gio | Intel Core Ultra 9 275HX, 24 cœurs / 31 Gio |
+| Caches exposés | L1d 64 Kio, L1i 128 Kio, L2 4 Mio ; ligne 128 o | L1d 48 Kio, L1i 64 Kio, L2 3 Mio, L3 36 Mio ; ligne 64 o |
+| Système | macOS 27.0, arm64 | Ubuntu 26.04 sous WSL2, amd64 |
+| Runtime | Go 1.27.1 | Go 1.27.1, GOAMD64 v1 |
 
-**Rigueur statistique.** Chaque version est mesurée dix fois par benchstat (p-values reportées) et
-quinze fois par Hyperfine après trois itérations de chauffe, avec `-N` pour supprimer le shell
-intermédiaire. Seuil de coefficient de variation fixé à **2 %** ; toute mesure au-dessus est signalée
-comme réserve. Une campagne lancée sur un arbre de travail modifié est refusée par le script.
+**Protocole CPU :** dix échantillons Go, résumés par benchstat ; quinze exécutions Hyperfine,
+après trois chauffes, sans shell intermédiaire. Les temps Go sont des **médianes**,
+ceux d'Hyperfine des **moyennes**. Les « ± » représentent respectivement un IC à 95 % et un
+écart-type. Le CV (écart-type / moyenne) signale la dispersion, pas la significativité.
 
-**Réserves assumées.** Le banc A est un MacBook Air à refroidissement passif : sa baseline dérive
-jusqu'à 3,2 % de CV selon les campagnes. Le banc B tourne sous WSL2, donc sous Hyper-V. Ces deux
-limites interdisent de comparer les *temps absolus* entre bancs ; seuls les **ratios** le sont, et ce
-rapport ne met jamais les deux machines en regard autrement.
+| Mesure | Travail chronométré |
+|---|---|
+| Hyperfine, binaire `-quiet` | Démarrage + génération de carte + construction + simulation ; ni rendu, ni I/O |
+| `BenchmarkRun` | Construction + au plus 50 tours, hors génération ; état initial recréé à chaque opération |
+| `BenchmarkStep` | Tours successifs après 50 tours de chauffe ; ni construction, ni `Burning` |
 
-## 1.2 Domaine de simulation & dimensionnement
+L'état continue d'évoluer pendant `Step` : ses gains ne décrivent pas exactement les
+500 premiers tours du binaire. Les six moteurs sont comparés dans une même campagne par banc.
+La baseline A atteint **5,4 % de CV**, au-delà du seuil d'alerte de 2 % : prudence sur les petits
+gains. Les différences entre bancs ne sont pas attribuables au seul processeur.
 
-| Taille | Cases | Empreinte grille (baseline) | Rôle dans l'audit |
-|---|---:|---:|---|
-| 256² | 65 536 | 128 Ko | Détection des régressions de petite grille |
-| **1024²** | **1 048 576** | **2 Mo** | **Charge de référence — dépasse le L2 des deux bancs** |
-| 2048² | 4 194 304 | 8 Mo | Vérification du comportement hors cache |
+**Statistiques baseline / moteur retenu**, binaire 1024², 64 foyers, 500 tours,
+campagne `981c735`, 15 répétitions par ligne. Écart-type et variance calculés sur les
+échantillons avec le diviseur `n − 1`, avant arrondi.
 
-Deux régimes, qui ne désignent pas les mêmes goulots :
+| Banc / moteur | Moyenne (s) | Médiane (s) | Écart-type (s) | Variance (s²) | CV |
+|---|---:|---:|---:|---:|---:|
+| A / `naive` | 6,6328 | 6,5498 | 0,3588 | 1,288e-1 | 5,4 % |
+| A / `bitpack` | 0,5916 | 0,5897 | 0,0077 | 5,956e-5 | 1,3 % |
+| B / `naive` | 8,2452 | 8,2317 | 0,0564 | 3,186e-3 | 0,7 % |
+| B / `bitpack` | 0,7661 | 0,7675 | 0,0080 | 6,329e-5 | 1,0 % |
 
-| Scénario | Foyers | Comportement | Ce qu'il met sous tension |
-|---|---:|---|---|
-| `embrasement` | 64 | La carte brûle partout | Le corps de `Step`, le coût par case |
-| `front` | 1 | Un seul front actif, grille creuse | Le balayage inutile des cases éteintes |
+Sources : [environnement A](../results/981c735/m1-air/env.md) /
+[B](../results/981c735/x86-controle/env.md) ; [benchmarks](../internal/bench/bench_test.go) ;
+statistiques des six moteurs [A](../results/981c735/m1-air/hyperfine-stats.md) /
+[B](../results/981c735/x86-controle/hyperfine-stats.md).
 
-## 1.3 Tableau comparatif des mesures brutes
+## 1.2 Charge et dimensionnement
 
-Binaire complet, 1024², 64 foyers, 500 tours, 15 répétitions, campagne `981c735` — **les six
-versions mesurées dans une même session sur chaque banc**, seule façon d'obtenir des ratios non
-contaminés par la dérive machine.
+| Grille | Cases | État mutable de la baseline, à 2 o/case |
+|---|---:|---:|
+| 256² | 65 536 | 128 Kio |
+| **1024² - référence** | **1 048 576** | **2 Mio** |
+| 2048² | 4 194 304 | 8 Mio |
 
-| Version | Stratégie | Banc A | CV | Banc B | CV | allocs/`Step` | **Cumul A** | **Cumul B** |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| **V0** `naive` | Baseline `[][]Cell`, 2 o/case, tampon par tour | 6,6328 s | **5,4 %** | 8,2452 s | 0,7 % | 1 | ×1 | ×1 |
-| **V1** `flat` ⚠ | Grille contiguë, double tampon réutilisé | 6,3781 s | 0,8 % | 8,2330 s | 0,6 % | 0 | ×1,040 | **×1,001** |
-| **V2** `counters` | Compteur de cases en feu incrémental | 6,0149 s | 1,7 % | 7,8536 s | 0,8 % | 0 | ×1,103 | ×1,050 |
-| **V3** `ghost` | Bordure fantôme, plus aucun modulo | 5,0866 s | 0,4 % | 4,5822 s | 1,2 % | 0 | ×1,304 | ×1,799 |
-| **V4** `bitpack` ★ | États et propagation par plans de bits | **0,5916 s** | 1,3 % | **0,7661 s** | 1,0 % | 0 | **×11,21** | **×10,76** |
-| **V5** `front` ⚠ | Liste des cases actives, balayage restreint | 9,0816 s | 1,8 % | 8,2312 s | 0,4 % | 0 | ×0,730 | ×1,002 |
+À 1024², la grille seule tient sous les capacités L2 exposées ; avec terrain, vent et tampon
+d'ignition, la baseline manipule environ **5 Mio de tableaux**. Aucun compteur de défauts de
+cache n'a été mesuré.
 
-⚠ régression • ★ version retenue
+Deux charges : **`embrasement`**, graine 42 et 64 foyers initiaux ; **`front`**, graine 42,
+un foyer et 50 premiers tours. Ces noms ne garantissent pas une densité constante.
 
-**Réserve sur la baseline du banc A.** `naive` y affiche 5,4 % de CV, très au-dessus du seuil de 2 %,
-avec une amplitude de 6,25 à 7,48 s — le refroidissement passif du MacBook Air, déjà signalé au §1.1.
-Comme cette valeur est le dénominateur de toute la colonne « Cumul A », **les gains inférieurs à 10 %
-n'y sont pas lisibles** : le ×1,040 de V1 tient dans l'incertitude. Les ordres de grandeur, eux, ne
-sont pas menacés. Deux relances successives n'ont pas stabilisé cette ligne, ce qui en fait une
-limite du banc plutôt qu'un incident.
+## 1.3 Comparaison des moteurs
 
-**V5 est le cas le plus instructif du projet parce qu'elle se contredit selon l'échelle
-d'observation** (banc B, campagne `981c735`) :
+**Binaire complet : 1024², 64 foyers, 500 tours demandés, campagne `981c735`.**
+Temps moyens ; CV entre parenthèses ; accélérations par rapport à `naive`.
 
-| Mesure | `bitpack` | `front` | Verdict |
-|---|---:|---:|---|
-| `Run`, scénario creux, 1024² | 11,89 ms | **3,78 ms** | **×3,1 en faveur de V5** |
-| `Step`, embrasement, 1024² | 175 µs | 11 159 µs | ×64 contre |
-| Binaire, embrasement 500 tours | 0,7661 s | 8,2312 s | ×10,7 contre |
-| Binaire, régime creux 50 tours | 686,8 ms | 686,5 ms | indistinguable |
+| Moteur | Stratégie | Banc A | Banc B | Accélération A / B |
+|---|---|---:|---:|---:|
+| `naive` | `[][]Cell`, tampon alloué par tour | 6,6328 s (5,4 %) | 8,2452 s (0,7 %) | ×1 / ×1 |
+| `flat` | Grilles contiguës, tampons réutilisés | 6,3781 s (0,8 %) | 8,2330 s (0,6 %) | ×1,040 / ×1,001 |
+| `counters` | Compteur de cases en feu | 6,0149 s (1,7 %) | 7,8536 s (0,8 %) | ×1,103 / ×1,050 |
+| `ghost` | Halo, propagation sans modulo | 5,0866 s (0,4 %) | 4,5822 s (1,2 %) | ×1,304 / ×1,799 |
+| **`bitpack`** | Plans de bits, calcul par mots | **0,5916 s (1,3 %)** | **0,7661 s (1,0 %)** | **×11,21 / ×10,76** |
+| `front` | Listes de cases actives | 9,0816 s (1,8 %) | 8,2312 s (0,4 %) | ×0,730 / ×1,002 |
 
-L'étape **fait exactement ce pour quoi elle a été écrite** — diviser par trois le coût de la
-simulation quand la grille est creuse — et reste **invisible de bout en bout**, parce que la
-génération de carte seule coûte 682,3 ms sur les 686,5 du binaire dans ce régime, soit **99,4 %**.
-Elle annule par ailleurs toute la chaîne en régime saturé : maintenir une liste de cases actives
-quand tout brûle revient à payer la gestion de la liste en plus du travail, et à perdre la
-propagation par mots de 64 bits qui fait l'intérêt de V4.
+À 1024², le microbenchmark mesure **1 Mio et une allocation par `Step` pour `naive`**,
+contre **zéro pour tous les moteurs optimisés**. `flat` n'est pas une régression établie ici.
 
-**Aucune version n'est donc la meilleure dans les deux régimes** — ce que le §1.2 anticipait en en
-définissant deux. Mesuré sur le seul embrasement, `front` aurait été jeté à tort.
+**Filiation :** `flat` reprend `naive`, `counters` ajoute le compteur, `ghost` remplace
+l'adressage de propagation, puis `bitpack` remplace représentation et halo.
+**`front` est une variante de `counters`, pas un successeur de `bitpack`.**
 
-**Débit.** De 7,90 × 10⁷ à 8,86 × 10⁸ cases/s sur le banc A ; de 6,36 × 10⁷ à 6,84 × 10⁸ sur le banc B.
-
-**Microbenchmark `Step`**, embrasement 1024², banc B : 12 547 µs (V0) → **175 µs** (V4), soit
-**×71,7**. L'écart avec le ×10,76 du binaire est analysé au §2.4.
-
-**Le fait le plus instructif du tableau** : les étapes prises une à une dépendent fortement de
-l'architecture — `ghost` rend ×1,80 sur le banc B contre ×1,30 sur le banc A, `bitpack` fait
-l'inverse — mais **les cumuls se rejoignent autour de ×11 sur les deux bancs**. Là où une machine
-avait peu à gagner sur le modulo, elle avait davantage à gagner sur la compacité. Aucune machine
-seule ne l'aurait montré.
-
-L'écart résiduel entre ×11,21 et ×10,76 n'est pas interprétable : il est du même ordre que
-l'incertitude de la baseline du banc A. Une campagne antérieure à cinq versions donnait ×10,67 et
-×10,66, soit une coïncidence au millième — rapprochement qu'il aurait été tentant de présenter comme
-un résultat, et que la campagne suivante n'a pas reproduit. **C'est la convergence qui est le
-résultat, pas sa précision.**
-
-Sources : [banc A](../results/981c735/m1-air/hyperfine-stats.md) •
-[banc B](../results/981c735/x86-controle/hyperfine-stats.md) •
-[benchstat banc B](../results/981c735/x86-controle/benchstat.txt) • [régime creux](../results/981c735/x86-controle/front50-hyperfine.md)
-
-## 1.4 Représentation graphique
-
-![Profil CPU de la baseline, banc A](figures/m1-air/flame-cpu-naive.png)
-
-*Figure 1.1 — Flamegraph CPU de `naive` sur le banc A : `Step` occupe 95,30 % du temps cumulé.*
-
-![Profil CPU de la baseline, banc B](figures/x86-controle/flame-cpu-mod-naive.png)
-
-*Figure 1.2 — Même code, banc B : `fire.Mod` encadré occupe 37,19 % à lui seul, contre 9,20 % sur le
-banc A. C'est cet écart qui rend l'étape `ghost` quatre fois plus rentable sur x86.*
-
-![Profil d'allocations de la baseline, banc A](figures/m1-air/flame-alloc-naive.png)
-
-*Figure 1.3 — Profil `alloc_space` de `naive` : 489 Mo alloués dans `Step`, soit 82,26 % du total —
-un tampon de 1 Mio par tour, jamais réutilisé.*
-
-![Profil CPU de bitpack, banc A](figures/m1-air/flame-cpu-bitpack-10000t.png)
-
-*Figure 1.4 — Profil de la version retenue sur 10 000 tours : `Step` reste le seul poste
-(97,04 % cumulé), mais sur un volume de travail divisé par 72.*
-
-## 1.5 Axe I/O — sérialisation, persistance, cache
-
-Volet mené indépendamment de la chaîne CPU : les snapshots restent **hors du chemin chronométré**,
-exactement comme le rendu console, si bien qu'aucune mesure du §1.3 n'en dépend.
-
-**Formats de sérialisation**, état 1024², banc B :
-
-| Format | Temps d'écriture | Taille | Octets/case | Gain de taille |
-|---|---:|---:|---:|---:|
-| JSON (baseline) | 534,7 ms | 120,4 Mo | 114,8 | ×1 |
-| Protobuf | 13,84 ms | 4,19 Mo | 4,0 | ×29 |
-| **Binaire bit-packé** | **1,338 ms** | **1,57 Mo** | **1,5** | **×77** |
-| Binaire, décor omis | 0,849 ms | 524 Ko | 0,5 | **×230** |
-
-Le décor étant immuable, il n'est écrit que dans le premier snapshot d'une série : c'est là que se
-joue le dernier facteur 3, hors de portée de Protobuf dont le varint occupe un octet minimum.
-
-**Persistance PostgreSQL** (17.11 en conteneur, banc B) :
-
-| Mesure | Sans | Avec | Gain |
+| `Step/embrasement/1024` | `naive` | `bitpack` | Accélération |
 |---|---:|---:|---:|
-| 500 insertions : unitaires → un `COPY` | 83,35 ms | 6,565 ms | **×12,7** |
-| 5 000 insertions | 1,033 s | 54,38 ms | **×19,0** |
-| Requête sur 500 000 lignes, empreintes uniques | 8 257 µs | 176,5 µs | **×46,8** |
-| Même requête, empreintes répétées 1/10 | 8 776 µs | 4 567 µs | ×1,9 |
-| Même requête, 200 lignes | 147,5 µs | 148,3 µs | aucun |
+| Banc A | 10 279,7 µs | 196,9 µs | ×52,2 |
+| Banc B | 12 531,2 µs | 173,3 µs | ×72,3 |
 
-`EXPLAIN (ANALYZE, BUFFERS)` donne le mécanisme : `Seq Scan` sur 192 pages → `Index Only Scan` sur
-3 pages. **Un index ne se juge pas au nombre de lignes mais à la sélectivité du prédicat** — à
-volume et index identiques, ×46,8 contre ×1,9 selon la distribution des empreintes.
+**Charge creuse : `Run/front/1024`, construction incluse, génération exclue.**
 
-**Cache mémoire** — `sync.Pool` sur les tampons de sérialisation : −99,9 % d'octets alloués sur les
-deux bancs, mais **−6 à −22 % de temps sur le banc B et rien sur le banc A** (−1,9 % au mieux). Le
-gain venait de la remise à zéro évitée et du travail du ramasse-miettes, deux coûts de bande
-passante mémoire dont le M1 dispose plus largement.
+| Banc | `counters` | `bitpack` | `front` | Gain de `front` vs `counters` / `bitpack` |
+|---|---:|---:|---:|---:|
+| A | 122,866 ms | 12,275 ms | **2,161 ms** | **×56,9** / ×5,68 |
+| B | 84,770 ms | 11,869 ms | **3,737 ms** | **×22,7** / ×3,18 |
 
-Sources : [formats](../results/ae8b974/x86-controle/benchstat.txt) •
-[base](../results/8a71072/x86-controle/benchstat-store.txt) •
-[plans](../results/8a71072/x86-controle/explain-store.txt) •
-[pool A](../results/d533e30/m1-air/benchstat-pool.txt) •
-[pool B](../results/935ffbc/x86-controle/benchstat-pool.txt)
+L'objectif de `front` (au moins 20 % de temps en moins que `counters`, zéro allocation/`Step`)
+est atteint. En contrepartie, `Run` alloue **43 Mio/op contre 5 Mio/op**, soit **×8,6** :
+trois listes préallouées et l'état réservent environ 43N octets sur ces machines 64 bits,
+hors décor. **Ce n'est pas une mesure du pic de RAM du processus.**
 
-## 1.6 Reproductibilité
+Sources : Hyperfine [A](../results/981c735/m1-air/hyperfine.json) /
+[B](../results/981c735/x86-controle/hyperfine.json) ; Go brut
+[A](../results/981c735/m1-air/bench.txt) / [B](../results/981c735/x86-controle/bench.txt) ;
+[contrat de front](../internal/front/README.md).
+
+## 1.4 Sérialisation et persistance
+
+**Formats, banc B, 1024², campagne `ae8b974`, dix répétitions, avant le pool.**
+État préconstruit, écriture vers `io.Discard` : ni capture, ni disque, ni réseau.
+
+| Format | Médiane d'écriture (IC 95 %) | Taille | Réduction de taille vs JSON |
+|---|---:|---:|---:|
+| JSON verbeux | 534,7 ms (±28 %) | 120,4 Mo | ×1 |
+| Protobuf | 13,84 ms (±3 %) | 4,19 Mo | ×28,7 |
+| Binaire `packed` | **1,338 ms (±1 %)** | **1,573 Mo** | **×76,6** |
+| `packed`, décor omis | 0,849 ms (±1 %) | 524,3 ko | ×229,7 |
+
+Le résultat vaut pour les schémas implémentés : JSON contient un objet par case avec coordonnées
+et indentation ; `packed` range deux états par octet. Omettre le décor exige de le conserver
+et de le rattacher ailleurs, ce que le codec n'automatise pas. Protobuf pourrait également
+omettre le décor ou transporter des données bit-packées.
+
+**PostgreSQL 17.11 local, banc B, campagne `8a71072`, six répétitions.**
+Durabilité désactivée : `fsync=off`, `synchronous_commit=off`, `full_page_writes=off`.
+
+| Essai | Référence | Variante | Accélération |
+|---|---:|---:|---:|
+| 500 INSERT unitaires → COPY | 83,35 ms | 6,565 ms | ×12,7 |
+| 5 000 INSERT unitaires → COPY | 1,033 s | 54,38 ms | ×19,0 |
+| Index, 20 000 lignes, empreintes uniques | 601,8 µs | 153,9 µs | ×3,9 |
+| Index, 500 000 lignes, empreintes uniques | 8 257,2 µs | 176,5 µs | ×46,8 |
+| Index, 500 000 lignes, empreinte présente dans 10 % des lignes | 8 776 µs | 4 567 µs | ×1,9 |
+
+Les insertions concernent des métadonnées, pas les snapshots. COPY change à la fois le protocole,
+le traitement des commandes et les transactions (INSERT en autocommit) : le gain ne mesure pas
+la seule latence réseau. Les IC des insertions atteignent ±16 %. Les requêtes répétées après
+`ANALYZE` ne sont pas des tests à cache froid ; ces temps ne décrivent pas une production durable.
+
+Sources : [formats](../results/ae8b974/x86-controle/benchstat.txt) ;
+[SQL](../results/8a71072/x86-controle/benchstat-store.txt) ;
+[configuration SQL](../results/8a71072/x86-controle/env.md).
+
+## 1.5 Reproductibilité
 
 ```bash
-make tools                      # benchstat
-make bench-cpu BANC=<nom>       # env + conformité + build + benchstat + Hyperfine
-make bench-io  BANC=<nom>       # bancs de sérialisation et de persistance
-make profile IMPL=<v> BANC=<n>  # profils CPU et alloc_space
-make db / make db-stop          # PostgreSQL en conteneur, sans volume
+make tools                       # benchstat ; Go et Hyperfine requis
+make test
+make bench-cpu BANC=m1-air        # adapter le nom au banc
+make profile IMPL=bitpack BANC=m1-air
+make db                          # base expérimentale
+make bench-io BANC=m1-air         # résultats bruts Snapshot/Store
+make db-stop                     # arrête la base et supprime ses données
+# Pool : package distinct, non parcouru par bench-io
+go test ./internal/snapshot -run '^$' -bench '^BenchmarkPool$' -benchmem -count 6
 ```
 
-Chaque campagne produit `results/<commit-de-code>/<banc>/`. Le dossier porte **le dernier commit
-ayant touché le code**, non `HEAD` : deux machines rangent ainsi leurs mesures au même endroit sans
-se synchroniser sur un hash. Les tests d'intégration PostgreSQL sont **sautés** et non échoués quand
-la base est absente, pour que `make test` reste vert sans Docker.
+Le [script CPU](../scripts/run_benchmarks.sh) archive sous `results/<commit-de-code>/<banc>/`
+et contrôle les modifications suivies, sauf forçage ; `bench-io` n'a pas ces mêmes garanties.
+Les essais SQL sont sautés si la base est inaccessible. Certaines fiches signalent un arbre
+modifié, sans diff archivé : l'identité exacte du code mesuré ne peut alors être certifiée
+(le signal peut aussi venir de la réécriture des résultats). Une reproduction stricte demande
+des commandes complètes, un arbre identifié et des versions figées de benchstat et PostgreSQL.
 
----
+# Partie II - Diagnostic & choix d'ingénierie
 
-# Partie II — Diagnostic matériel & choix d'ingénierie
+## 2.1 Diagnostic du chemin critique
 
-## 2.1 Diagnostic & identification du hot path
+Trois coûts sont identifiés dans la baseline :
 
-`go tool pprof` sur la baseline désigne trois verrous, et **leur hiérarchie diffère selon la
-machine** — c'est le résultat qui a structuré tout le plan d'optimisation :
+| Observation | Mesure | Levier |
+|---|---|---|
+| Tampon d'ignition recréé | 1 Mio alloué par tour à 1024² | Réutiliser les tampons |
+| Adressage torique | `Mod` : 5,24 % du CPU propre sur A, 41,06 % sur B (`dcc3622`) | Halo puis opérations sur mots |
+| Recompte de toutes les cases | `Burning` : 20,68 % sur A, 23,39 % sur B en charge creuse (`1d3a093`) | Compteur incrémental |
 
-| Poste | Banc A | Banc B | Nature du coût |
-|---|---:|---:|---|
-| `Step` (corps) | 76,28 % | 48,78 % | Balayage complet, 8 voisins par case |
-| **`fire.Mod`** | **9,20 %** | **37,19 %** | Enroulement torique par modulo, 8 par case |
-| `Map.At` | 12,88 % cum. | inclus | Indirection `[][]Cell`, deux déréférencements |
-| `Burning` | 3,27 % saturé / **21 %** en front | idem | Recompte la grille entière à chaque appel |
+![Profil CPU de naive sur le banc B](figures/x86-controle/flame-cpu-mod-naive.png)
 
-**1 — Pression sur le ramasse-miettes.** `Step` alloue un tampon de 1 Mio par tour, jamais réutilisé :
-489 Mo cumulés sur 500 tours, soit 82,26 % des allocations du programme.
+*Figure 2.1 - Baseline B, campagne `dcc3622` : `Mod` représente 41,06 % du temps propre,
+41,18 % du cumulé. Le profil CPU démarre après la génération de carte.*
 
-**2 — Division entière sur le chemin chaud.** Le modulo coûte 20 à 40 cycles et n'est pas
-vectorisable. Sur x86 il représente plus du tiers du temps ; sur ARM, dont le diviseur est plus
-rapide, moins du dixième — **un rapport de 4 pour la même ligne de code.**
+![Profil des allocations cumulées de naive sur le banc A](figures/m1-air/flame-alloc-naive.png)
 
-**3 — Travail inutile en régime creux.** En scénario `front`, `Burning` recompte le million de cases
-à chaque tour pour n'en trouver que quelques centaines allumées.
+*Figure 2.2 - Baseline A, campagne `dcc3622`, profil `alloc_space` : environ **489 Mio
+attribués à `Step`, soit 82,14 %** des allocations cumulées échantillonnées. Le « MB »
+affiché par pprof correspond ici à 2²⁰ octets ; il ne mesure ni le pic de RAM ni le temps du GC.*
 
-## 2.2 Choix d'ingénierie en 3 axes
+Ce profil mémoire couvre le démarrage, contrairement au profil CPU ; son échantillonnage est
+affiné après `Generate`. Le microbenchmark confirme le levier : à 1024², `naive` alloue
+1 Mio par `Step`, contre zéro pour `flat` et les moteurs suivants.
 
-**Axe 1 — Mémoire & localité de cache.** Grille contiguë `[]Cell` en remplacement de `[][]Cell`, deux
-tampons permutés au lieu d'une allocation par tour (**0 alloc/`Step`**), puis représentation en
-**plans de bits** : `feu` et `repos` tiennent chacun sur 2 bits, soit 4 bits par case contre 16.
-Une ligne de cache de 64 octets porte alors 128 cases au lieu de 32, et la propagation traite
-**64 cases par mot** de 64 bits par OU logique au lieu de répéter la logique par cellule. C'est
-l'étape qui rend le facteur 10.
+Ces parts localisent les coûts, sans établir un nombre de cycles par modulo, un défaut de cache
+ou un GC dominant. Les temps cumulés incluent les appels : ils ne s'additionnent pas aux temps
+propres. `Map.At` calcule un indice torique ; l'indirection `[][]Cell` est dans la grille.
 
-**Axe 2 — Concurrence & scalabilité CPU.** *Axe non traité dans l'état actuel du projet* — et ce
-n'est pas un oubli mais une conséquence mesurée : depuis `bitpack`, la simulation ne pèse plus que
-10 % du temps du binaire (§2.4), ce qui plafonne tout gain de parallélisation de `Step` à 10 % du
-bout en bout, loi d'Amdahl. Le plan prévu — worker pool dimensionné aux **cœurs performance** (4 sur
-le banc A) et non à `GOMAXPROCS`, agrégation du compteur par `atomic`, arrêt précoce à l'extinction,
-courbe de scalabilité 1/2/4/8 — reste valide, mais s'appliquerait désormais à `fire.Generate`.
+Sources : profils CPU [A](../results/dcc3622/m1-air/profiles/naive-cpu-top.txt) /
+[B](../results/dcc3622/x86-controle/profiles/naive-cpu-top.txt) ; profils creux
+[A](../results/1d3a093/m1-air/profiles/naive-front50-cpu-top.txt) /
+[B](../results/1d3a093/x86-controle/profiles/naive-front50-cpu-top.txt) ;
+[profil d'allocations A](../results/dcc3622/m1-air/profiles/naive-mem-top.txt).
 
-**Axe 3 — I/O réseau & persistance.** Trois formats comparés sur le même état (§1.5), le binaire
-bit-packé l'emportant d'un facteur 77 sur JSON. Côté base, le coût dominant est **le nombre
-d'allers-retours et non le volume** : un `COPY` remplace 500 requêtes et divise le temps par 12,7,
-sur `localhost`, c'est-à-dire dans les conditions les plus défavorables à la démonstration. Le
-`sync.Pool` supprime 99,9 % des octets alloués par snapshot, pour un gain en temps qui ne survit pas
-au changement d'architecture.
+## 2.2 Choix d'ingénierie en trois axes
 
-## 2.3 Confrontation critique & échecs constructifs
+**1. Mémoire et organisation du calcul.** `flat` réutilise les tampons ; `counters` évite
+le balayage de `Burning` ; `ghost` supprime les modulos de propagation.
+`bitpack` représente l'état sur **4 bits au lieu de 16 par case**, hors arrondi des lignes,
+et traite **64 cases par mot**, avec un traitement séparé du vent. Cela ne divise pas toute la
+mémoire par quatre : `New/bitpack` alloue 5,437 Mio, contre 5,000 pour `counters`, hors carte.
+`front` réduit plutôt le nombre de cases visitées ; son pire cas et sa mémoire restent O(N).
 
-| Tentative | Hypothèse | Gain constaté | Régression mesurée | Verdict |
-|---|---|---|---|---|
-| **V1** `flat` — double tampon | Supprimer les allocations par tour réduit le temps | 0 alloc/`Step`, −489 Mo | ×0,998 banc B, ×0,999 banc A | **Conservée** comme socle, gain nul assumé |
-| **Index SQL** — seuil annoncé | Un ordre de grandeur « dès quelques dizaines de milliers de lignes » | ×46,8 à 500 000 lignes | ×3,9 seulement à 20 000 : seuil sous-estimé ×25 | **Hypothèse partiellement réfutée** |
-| **Déduplication** de snapshots | Éviter de réécrire un état déjà vu doit rapporter plus que le pool | −55,9 % sur `proto` | **+73,6 % sur `packed`** | **Écartée par défaut** |
-| **`sync.Pool`** — portabilité | Le gain tient au volume alloué, donc il vaut partout | −6 à −22 % banc B | non significatif banc A | **Conservée**, gain non portable |
-| **`counters`** en 256² | Le compteur incrémental ne coûte rien | −5,9 % en 1024² | +1,8 % sur `Step` en 256², banc A | **Conservée**, compromis local documenté |
-| **V5** `front` — liste des cases actives | Ne balayer que les cases actives doit gagner en régime creux | **×3,1** sur la simulation creuse | **×64 sur `Step` saturé**, binaire ramené à la baseline | **Non retenue par défaut**, conservée comme variante de régime |
+**2. Concurrence et scalabilité CPU.** **Axe non implémenté** : aucune courbe de montée en charge
+par nombre de workers. L'arrêt à l'extinction existe déjà dans `fire.Run`. Le poids des coûts
+fixes oriente la prochaine expérience vers la génération, sans rendre la parallélisation de
+`Step` inutile pour des simulations plus longues.
 
-**Échec n°1 — L'optimisation qui supprime des allocations sans gagner de temps.** `flat` atteint zéro
-allocation par `Step` et **régresse** de 0,2 %. Le second tampon ajoute 2N octets de stockage
-persistant et modifie les accès mémoire. *Enseignement : réduire le volume cumulé alloué ne garantit
-ni une réduction du temps CPU, ni une réduction du pic de mémoire.*
+**3. I/O et persistance.** Compacter les états, grouper les insertions et indexer les recherches
+sélectives répondent à des coûts distincts. Ces gains ne s'ajoutent pas au ×11 du moteur :
+le binaire mesuré n'utilise pas cette chaîne I/O.
 
-**Échec n°2 — Deux optimisations d'un même axe qui se neutralisent.** La déduplication devait
-supprimer la sérialisation entière des snapshots redondants. Elle y parvient — 72,64 % d'écritures
-évitées — et reste **perdante sur le format retenu** : l'empreinte coûte 27 µs, l'écriture `packed`
-qu'elle évite n'en coûte que 19. *Les étapes précédentes de l'axe avaient rendu la sérialisation si
-peu coûteuse qu'elles ont retiré sa raison d'être à celle-ci. Une optimisation ne se juge pas dans
-l'absolu mais contre l'état du code au moment où on l'évalue.*
+## 2.3 Journal expérimental et confrontation critique
 
-**Trois pièges de périmètre, tous rencontrés et tous chiffrés.** Une mesure ne vaut que si son
-périmètre est celui du changement :
+Trois exemples relient les hypothèses documentées aux expériences et aux décisions retenues
+dans cet audit. Les objectifs chiffrés des moteurs viennent de leurs README ; l'hypothèse
+de déduplication est décrite dans le prototype.
 
-| Piège | Ce qu'annonçait la mesure | Réalité | Cause |
+| Hypothèse initiale | Expérience choisie | Résultat | Décision |
 |---|---|---|---|
-| `BenchmarkRun` sur `flat` | ×3,4 | ×1,12 | Le banc reconstruisait le moteur à chaque itération (1 076 allocations) |
-| Hyperfine `front 50` sur `counters` | +3,2 % | +21,8 % | 88 % de la mesure était de la génération de carte |
-| Hyperfine `front 50` sur V5 | aucun gain | ×3,1 sur la simulation | 99,4 % de la mesure était de la génération de carte |
-| Banc d'empreinte | 0,150 ms | 1,785 ms | Résultat jamais lu : le compilateur supprimait le calcul |
+| **`bitpack`** : calculer par mots pour réduire d'au moins 20 % le temps de `Step` face à `ghost`, sans allocation | `Step/embrasement/1024`, dix répétitions sur A et B ; contrôle Hyperfine à 500 tours | Temps de `Step` divisé par **45,5 sur A et 44,4 sur B** ; zéro allocation ; gain global confirmé au §1.3 | Objectif atteint ; retenir `bitpack` pour la charge 500 tours / 64 foyers |
+| **`front`** : ne visiter que les cases actives pour réduire d'au moins 20 % `Run/front` face à `counters`, sans allocation par `Step` | `Run/front/1024`, 50 tours, dix répétitions sur A et B ; allocations et contre-essai à 500 tours / 64 foyers | Temps divisé par **56,9 sur A et 22,7 sur B**, mais **×8,6 d'octets alloués par Run** et régression au contre-essai | Conserver comme variante creuse ; ne pas remplacer `bitpack` sur la charge dense longue |
+| **Déduplication** : éviter les sérialisations répétées pour gagner du temps malgré le hachage | Sur B, 201 états préconstruits en 128² ; cache de 0 à 32 entrées, six répétitions ; hachage inclus, sortie vers `io.Discard` | Avec 32 entrées, **72,64 %** d'écritures évitées ; **−55,9 %** de temps sur `proto`, **+73,6 %** sur `packed` | Écarter la déduplication pour `packed` dans cette charge ; bénéfice local pour `proto`, sans généralisation à un archivage réel |
 
-Le troisième s'est trahi par une grandeur physique impossible — 0,15 ns par case, soit moins d'un
-cycle pour deux multiplications dépendantes. **Un banc dont le résultat n'est jamais lu ne mesure
-rien**, et la seule défense est de ramener chaque temps à une grandeur physique avant d'y croire.
+**Pourquoi les verdicts diffèrent.** Le contre-essai `front` coûte **51,0 % de temps en plus
+sur A et 4,8 % sur B** face à `counters` : le succès dépend du régime. Pour la déduplication,
+la série couvre 2 000 tours, un foyer, avec capture tous les dix tours. Le hachage coûte
+27,50 µs, contre environ 19 µs d'écriture moyenne `packed` sans cache (3,824 ms / 201).
+La rentabilité exige : **coût du hachage et de la recherche < taux de doublons × coût d'écriture évité**.
+Le prototype ne vérifie pas les collisions et ne conserve pas les références chronologiques :
+ce n'est pas encore un archivage complet sans perte.
 
-## 2.4 Bascule du goulot & étape logique suivante
+**Autres enseignements.**
 
-Le microbenchmark `Step` gagne ×72,5 quand le binaire n'en gagne que ×10,66. L'écart n'est pas une
-contradiction : c'est la **génération de carte**, que ces optimisations ne touchent pas. Mesurée
-directement à zéro tour sur les deux bancs :
+- `flat` supprime les allocations par tour, sans gain temporel important sur le binaire :
+  moins d'allocations ne garantit ni moins de CPU ni moins de mémoire vivante.
+- L'index gagne ×3,9 à 20 000 lignes uniques et ×46,8 à 500 000 ; le seuil exact de ×10 reste
+  inconnu. L'`EXPLAIN` à **20 000 lignes** passe de 192 blocs en `Seq Scan` à trois en
+  `Index Only Scan`, avec encore un accès au tas.
+- Le pool préchauffé réduit les octets alloués d'environ 99,9 %. Les gains de temps significatifs
+  sont de −1,87 % sur A pour `packed` 1024² et de −6,27 à −21,60 % dans trois cas sur B
+  (p=0,002) ; les autres cas sont non significatifs. Les parts du GC et des caches ne sont pas isolées.
 
-| | Banc A | Part | Banc B | Part |
-|---|---:|---:|---:|---:|
-| Génération de la carte (bruit lissé + quantiles) | 508,2 ms | **86 %** | 682,3 ms | **89 %** |
-| Simulation, 500 tours | 83,4 ms | 14 % | 83,8 ms | 11 % |
+Sources : hypothèses [bitpack](../internal/bitpack/README.md), [front](../internal/front/README.md),
+[déduplication](../internal/snapshot/dedup.go) ; [protocole de série](../internal/bench/serie_test.go) ;
+comparaisons Go [A](../results/981c735/m1-air/benchstat.txt) /
+[B](../results/981c735/x86-controle/benchstat.txt) ;
+[plans SQL](../results/8a71072/x86-controle/explain-store.txt) ;
+pool [A](../results/d533e30/m1-air/benchstat-pool.txt) /
+[B](../results/935ffbc/x86-controle/benchstat-pool.txt) ;
+[série](../results/935ffbc/x86-controle/benchstat-serie.txt) ;
+[hachage corrigé](../results/935ffbc/x86-controle/empreinte.txt).
 
-Rapportée à la seule simulation, la chaîne rend **×72** sur le banc A et **×97** sur le banc B.
-Détail à relever : après optimisation, **les deux machines mettent le même temps à simuler** — 83,4
-contre 83,8 ms — alors que le banc A était 20 % plus rapide sur la baseline. La chaîne a rapproché
-deux architectures que le code naïf séparait.
+## 2.4 Coûts fixes et loi d'Amdahl
 
-**Conséquence, et elle est contraignante.** La loi d'Amdahl plafonne désormais toute optimisation de
-`Step` à 10 % du temps de bout en bout — et à 0,6 % en régime creux, où la génération occupe 99,4 %
-du binaire. L'étape V5 en fait la démonstration involontaire : elle divise par trois le coût de la
-simulation creuse sans que le binaire ne bouge d'une milliseconde. La parallélisation de `Step`,
-dernière étape du plan initial, bute sur le même plafond avant même d'être écrite.
+Les gains de `Step` dépassent ceux du binaire, qui inclut notamment la génération.
+Les compléments Hyperfine donnent la décomposition **approximative** suivante :
 
-**L'étape logique suivante est `fire.Generate`**, que rien n'a jamais touché, et elle porte deux
-leviers indépendants : paralléliser `champLisse` par plages de lignes, et remplacer les quatre tris
-complets de `quantile` par un quickselect, O(n) au lieu de O(n log n). Sur 24 threads, ramener 686 ms
-à 100-200 ms porterait le binaire de ×10,66 à environ ×25.
+| `bitpack`, 1024² | Banc A | Banc B |
+|---|---:|---:|
+| Binaire, 500 tours / 64 foyers | 591,6 ms | 766,1 ms |
+| Référence hors tours | 508,2 ± 14,5 ms | 682,3 ± 13,1 ms |
+| Différence des moyennes | 83,4 ms (14,1 %) | 83,8 ms (10,9 %) |
 
-**Cette bascule est elle-même le résultat le plus transférable de l'audit** : une chaîne
-d'optimisations ne se planifie pas d'avance, elle se re-priorise à chaque profil. Le plan initial
-désignait six étapes ; la quatrième a rendu les deux suivantes sans objet et a fait apparaître une
-cible que le diagnostic initial ne voyait pas, parce qu'elle était alors invisible derrière un `Step`
-soixante-douze fois plus lourd.
+La référence A est « bitpack 0 tour » ; celle de B est étiquetée « generation seule », sans commande
+détaillée archivée. **Zéro tour inclut encore le démarrage et le constructeur dans la CLI** :
+ce n'est pas une mesure isolée de `Generate`, et les soustractions restent sensibles au bruit.
 
----
+Amdahl donne `accélération globale = 1 / ((1 − f) + f / s)`.
+**Si** la fraction accélérable vaut 11 à 14 %, la supprimer entièrement réduit le temps total
+de 11 à 14 % (×1,12 à ×1,16) ; la diviser par deux ne réduit le total que de 5,5 à 7 %.
+
+L'essai creux B illustre cette limite : `bitpack → front` accélère le microbenchmark,
+mais le binaire passe de **686,8 ± 11,2 à 686,5 ± 11,2 ms**, sans gain discernable.
+**Ce test ne comporte pas `counters`** : il ne démontre pas l'absence de gain global face à
+cette base. Les quelques millisecondes résiduelles ne permettent pas non plus de fixer
+un plafond précis à 0,6 %.
+
+**Suite proposée :** chronométrer séparément génération, construction et tours, puis compléter
+`front/counters` sur le binaire creux. Le profil CPU actuel exclut `Generate` : il faut d'abord
+le mesurer avant de tester la réutilisation des tris de quantiles, la réduction des modulos
+du lissage ou sa parallélisation bornée. Aucun gain futur n'est présenté comme acquis.
+
+Sources : [zéro tour A](../results/981c735/m1-air/zero-turns-hyperfine.json) ;
+[essai creux B](../results/981c735/x86-controle/front50-hyperfine.md) ;
+[périmètre de la CLI](../cmd/wildfire/main.go) ; [générateur](../internal/fire/carte.go).
 
 # Conclusion
 
-**Résultat.** Le binaire complet passe de 6,63 s à 0,59 s sur le banc A et de 8,25 s à 0,77 s sur le
-banc B, soit **×11,2 et ×10,8** sur deux architectures que tout oppose. Rapportée à la seule
-simulation, hors génération de carte, la chaîne rend **×72 et ×97**. Le débit passe de 7,9 × 10⁷ à
-8,9 × 10⁸ cases par seconde.
+**`bitpack` est le meilleur choix mesuré pour 500 tours / 64 foyers : environ ×11 sur les deux
+bancs. `front` réussit l'optimisation creuse, au prix d'une forte capacité mémoire réservée.**
+Le choix dépend donc de la charge, pas d'un classement universel des moteurs.
+La CLI conserve `naive` par défaut.
 
-**Ce que la mesure a dit contre nous.** Cinq hypothèses ont été écrites avant leur code ; **trois ont
-été réfutées** :
+Le volet I/O confirme l'intérêt du format compact, du groupage et de la sélectivité des index ;
+la déduplication rappelle que le coût d'une optimisation peut dépasser le travail évité.
+La priorité suivante est la mesure isolée de la génération ; la scalabilité multicœur reste
+à démontrer.
 
-| Hypothèse | Verdict |
+# Annexe - Gouvernance technique IA
+
+La [constitution du dépôt](../constitution.md) fixe quatre directives :
+
+| Directive | Application attendue |
 |---|---|
-| Supprimer les allocations par tour réduira le temps | Réfutée — zéro allocation, ×0,998 |
-| Un index SQL rend un ordre de grandeur dès quelques dizaines de milliers de lignes | Réfutée — seuil sous-estimé d'un facteur 25 |
-| `sync.Pool` gagne du temps partout, puisqu'il supprime des allocations partout | Réfutée — −22 % sur un banc, rien sur l'autre |
-| Grouper les insertions en un `COPY` rend un ordre de grandeur | Confirmée — ×12,7 à ×19,0 |
-| Le bit-packing rend le gain principal | Confirmée — ×5,9 à ×8,6 à elle seule |
+| Rôle | Ingénieur performance ; correction prioritaire ; baseline et tests de référence figés |
+| Contraintes | Éviter chaînes, allocations injustifiées, goroutines non bornées et verrous par case sur le chemin chaud |
+| Preuve | Hypothèse chiffrée + commande de mesure ; documenter gains, régressions et résultats non significatifs |
+| Format | Réponses compactes, commandes reproductibles, chiffres avec unités |
 
-S'y ajoutent **quatre pièges de périmètre**, où la mesure annonçait un chiffre faux sans rien
-signaler : un benchmark qui reconstruisait l'objet mesuré, deux mesures noyées par la génération de
-carte, et un calcul supprimé par le compilateur faute d'être lu. Aucun n'a été détecté par la
-mesure elle-même — tous l'ont été en confrontant deux voies indépendantes, ou en ramenant un temps à
-une grandeur physique. **C'est le seul garde-fou qui ait fonctionné.**
-
-**État des trois axes.**
-
-| Axe | État | Gain |
-|---|---|---|
-| Mémoire & localité de cache | Traité, quatre étapes | Porte l'essentiel du ×11 |
-| I/O réseau & persistance | Traité, cinq étapes | ×77 sur la taille, ×12,7 sur les écritures, ×46,8 sur la requête |
-| Concurrence & scalabilité CPU | **Non traité** | Plafonné par Amdahl à 10 % du binaire |
-
-Le troisième axe n'est pas resté vide par manque de temps mais par décision mesurée : depuis V4, la
-simulation ne pèse plus que 11 à 14 % du binaire, et 0,6 % en régime creux. Paralléliser `Step`
-aurait exposé les trois mécanismes attendus — worker pool aux cœurs physiques, compteur atomique,
-arrêt précoce — pour un gain de bout en bout borné à 5 %. V5 en a fourni la démonstration
-involontaire en divisant par trois la simulation creuse sans que le binaire ne bouge.
-
-**Étape logique suivante, chiffrée.** `fire.Generate` occupe désormais 86 à 89 % du temps et n'a
-jamais été touché. Deux leviers indépendants y attendent : paralléliser `champLisse` par plages de
-lignes — c'est là que le worker pool trouverait enfin une charge qui le justifie — et remplacer les
-quatre tris complets de `quantile` par un quickselect, O(n) au lieu de O(n log n). Ramener 686 ms à
-150 ms porterait le binaire de ×10,8 à environ ×25.
-
-**Ce que le projet établit au-delà de ses chiffres.**
-
-1. **La même ligne de code coûte quatre fois plus cher sur un processeur que sur l'autre.** Le modulo
-   torique pèse 37 % du profil sur x86 et 9 % sur ARM ; l'étape qui le supprime rend ×1,80 d'un côté
-   et ×1,30 de l'autre. Une seule machine aurait donné une conclusion fausse sur la valeur de cette
-   optimisation.
-2. **Les gains individuels ne sont pas portables, leur cumul l'est.** Chaque banc gagne là où l'autre
-   avait moins à prendre, et les deux arrivent autour de ×11.
-3. **Aucune version n'est la meilleure dans les deux régimes.** V5 gagne ×3,1 sur grille creuse et
-   perd ×64 sur grille saturée. Le choix d'une implémentation dépend de la charge, pas de sa qualité
-   intrinsèque.
-4. **Une optimisation se juge contre l'état du code au moment où on l'évalue**, jamais dans l'absolu.
-   La déduplication de snapshots aurait été un succès avant le format bit-packé ; mesurée après, elle
-   coûte plus qu'elle ne rapporte.
-
----
-
-# Annexe — Gouvernance technique IA (`constitution.md`)
-
-Fichier placé à la racine du dépôt, contraignant tout assistant de génération de code sur ce projet,
-selon les quatre directives exigées.
-
-**Directive 1 — Rôle et posture système stricts.** L'assistant agit en ingénieur système et
-performance backend, gouverné par des métriques physiques réelles : cycles CPU, hiérarchie de cache,
-bande passante mémoire, coût du ramasse-miettes. Priorité à la localité et à l'élimination des
-allocations sur le chemin chaud.
-
-**Directive 2 — Contraintes négatives explicites.** Sur le chemin chaud (`Step`, propagation,
-`Fingerprint`) : `fmt.Sprintf` et la concaténation de chaînes bannis au profit de tampons fixes ;
-goroutines non bornées interdites, worker pool dimensionné aux cœurs physiques ; conversions
-`string` ↔ `[]byte` proscrites ; toute allocation sur le tas doit être justifiée ; aucun verrou
-global.
-
-**Directive 3 — Justification empirique obligatoire.** Toute proposition s'énonce comme un couple
-indissociable : **hypothèse d'impact matériel** et **commande de profiling** qui la vérifie. Toute
-affirmation non accompagnée de son protocole, ou contredite par benchstat, est rejetée — ce rapport
-en contient cinq, dont trois réfutées par la mesure.
-
-**Directive 4 — Formatage impératif et compact.** Injonctions précises et vérifiables, réponses
-denses, zéro verbiage descriptif.
-
-*Le fichier source complet est à la racine du dépôt sous `constitution.md`.*
+Ce cadre n'est pas un contrôle automatique : la référence de 64 o par ligne de cache ne vaut
+pas pour A (128 o), et `Fingerprint` conserve du formatage hérité, hors de `fire.Run`.
